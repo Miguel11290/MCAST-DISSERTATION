@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import Base, engine
+from routes_items import router as items_router
 import models
 
 app = FastAPI(title="Inventory & Safety Management System API")
@@ -20,3 +21,6 @@ Base.metadata.create_all(bind=engine)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+# Register routers
+app.include_router(items_router)
