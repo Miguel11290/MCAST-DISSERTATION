@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/health_page.dart';
+import 'screens/items_list_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Inventory & Safety Management System',
-      home: const HealthPage(),
+      home: const ItemsListScreen(),
     );
   }
 }
