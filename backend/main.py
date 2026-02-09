@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import Base, engine
 from routes_items import router as items_router
 from routes_inventory import router as inventory_router
+from routes_safety import router as safety_router
 import models
 
 app = FastAPI(title="Inventory & Safety Management System API")
@@ -26,3 +27,4 @@ def health():
 # Register routers
 app.include_router(items_router)
 app.include_router(inventory_router)
+app.include_router(safety_router)
