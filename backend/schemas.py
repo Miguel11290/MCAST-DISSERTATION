@@ -38,3 +38,17 @@ class InventoryLotRead(BaseModel):
     class Config:
         orm_mode = True
         from_attributes = True
+
+class SafetyCheckResult(BaseModel):
+    lot_id: int
+    item_id: int
+    status: str # "safe", "warning", "danger"
+    reasons: list[str]
+    quantity: float
+    max_safe_quantity: float | None = None
+    received_at: datetime
+    storage_days: int
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
