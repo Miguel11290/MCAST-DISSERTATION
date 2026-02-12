@@ -52,3 +52,14 @@ class SafetyCheckResult(BaseModel):
     class Config:
         orm_mode = True
         from_attributes = True
+
+class MLAnomalyResult(BaseModel):
+    lot_id: int
+    item_id: int
+    is_anomaly: bool
+    anomaly_score: float
+    top_signals: list[str] # e.g. ["quantity_ratio", "storage_days"]
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
