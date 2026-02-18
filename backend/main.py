@@ -5,6 +5,8 @@ from routes_items import router as items_router
 from routes_inventory import router as inventory_router
 from routes_safety import router as safety_router
 from routes_ml import router as ml_router
+from backend.routes_eval import router as eval_router
+from routes_metrics import router as metrics_router
 import models
 
 app = FastAPI(title="Inventory & Safety Management System API")
@@ -30,3 +32,5 @@ app.include_router(items_router)
 app.include_router(inventory_router)
 app.include_router(safety_router)
 app.include_router(ml_router)
+app.include_router(eval_router)
+app.include_router(metrics_router)
