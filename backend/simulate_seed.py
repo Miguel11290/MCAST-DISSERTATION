@@ -3,9 +3,13 @@ from datetime import datetime, timedelta
 from database import SessionLocal, Base, engine
 import models
 
-def run(n_items=8, n_lots=200):
+def run(n_items=20, n_lots=300):
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
+
+    db.query(models.InventoryLot).delete()
+    db.query(models.Item).delete()
+    db.commit()
 
     hazard_classes = ["oxidizer", "fuel", "binder", "explosive", None]
     locations = ["Store A", "Store B", "Store C", "Bay 1", "Bay 2"]
