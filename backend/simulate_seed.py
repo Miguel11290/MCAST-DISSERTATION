@@ -25,9 +25,9 @@ REAL_ITEMS = [
     ("Parlon (Chlorinated Rubber)", "binder", 100),
 
     # Other common materials / salts (still safe to name)
-    ("Copper(II) Chloride", "oxidizer", 30),
-    ("Calcium Chloride", "oxidizer", 40),
-    ("Strontium Carbonate", "oxidizer", 40),
+    ("Copper(II) Chloride", "color_agent", 30),
+    ("Calcium Chloride", "other", 40),
+    ("Strontium Carbonate", "color_agent", 40),
 
     # Packaging / components (for variety)
     ("Paper Tubes", "binder", 200),
