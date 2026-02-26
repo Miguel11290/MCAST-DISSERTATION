@@ -6,6 +6,7 @@ import schemas
 
 from ml_features import build_feature_vector, FEATURE_NAMES
 from ml_model import MODEL
+from explain_ml import top_feature_contributions
 
 router = APIRouter(prefix="/ml", tags=["ml"])
 
@@ -30,14 +31,15 @@ def simple_explanations(features: list[float]) -> list[str]:
     if hazard_num >= 3.0:
         signals.append("Higher hazard class category")
 
-    return signals[:3] # limit to top 3 signals
+    return signals[:3]  # limit to top 3 signals
+
 
 @router.post("/train")
 def train_model(contamination: float = 0.10, db: Session = Depends(get_db)):
     lots = db.query(models.InventoryLot).all()
     if len(lots) < 10:
         raise HTTPException(status_code=400, detail="Not enough lots to train (need at least ~10). Seed more data first.")
-    
+
     X = []
     for lot in lots:
         item = db.query(models.Item).filter(models.Item.id == lot.item_id).first()
@@ -47,7 +49,7 @@ def train_model(contamination: float = 0.10, db: Session = Depends(get_db)):
 
     if len(X) < 10:
         raise HTTPException(status_code=400, detail="Not enough valid lot-item pairs to train.")
-    
+
     MODEL.train(X, contamination=contamination)
     return {"trained": True, "samples": len(X), "contamination": contamination, "features": FEATURE_NAMES}
 
@@ -56,7 +58,7 @@ def train_model(contamination: float = 0.10, db: Session = Depends(get_db)):
 def detect_anomalies(db: Session = Depends(get_db)):
     if not MODEL.is_trained:
         raise HTTPException(status_code=400, detail="Model not trained. Call POST /ml/train first.")
-    
+
     lots = db.query(models.InventoryLot).order_by(models.InventoryLot.id.desc()).all()
 
     X = []
@@ -71,20 +73,29 @@ def detect_anomalies(db: Session = Depends(get_db)):
 
     if not X:
         return []
-    
+
     labels, scores = MODEL.predict(X)
 
     results = []
-    for(lot_id, item_id, feats), label, score in zip(meta, labels, scores):
+    for (lot_id, item_id, feats), label, score in zip(meta, labels, scores):
+        is_anom = (label == -1)
+
+        signals = simple_explanations(feats)
+
+        # Explainability (Option C): add top deviating features (robust deviation)
+        # Only attach when flagged as anomaly to keep output clean.
+        if is_anom:
+            top_feats = top_feature_contributions(X, feats, k=3)
+            signals.extend([f"Top deviation: {f}" for f in top_feats])
+
         results.append(
             schemas.MLAnomalyResult(
                 lot_id=lot_id,
                 item_id=item_id,
-                is_anomaly=(label == -1),
+                is_anomaly=is_anom,
                 anomaly_score=float(score),
-                top_signals=simple_explanations(feats),
+                top_signals=signals[:5],  # cap output
             )
         )
 
     return results
-        
