@@ -33,7 +33,7 @@ def simple_explanations(features: list[float]) -> list[str]:
     return signals[:3] # limit to top 3 signals
 
 @router.post("/train")
-def train_model(db: Session = Depends(get_db)):
+def train_model(contamination: float = 0.10, db: Session = Depends(get_db)):
     lots = db.query(models.InventoryLot).all()
     if len(lots) < 10:
         raise HTTPException(status_code=400, detail="Not enough lots to train (need at least ~10). Seed more data first.")
@@ -48,8 +48,8 @@ def train_model(db: Session = Depends(get_db)):
     if len(X) < 10:
         raise HTTPException(status_code=400, detail="Not enough valid lot-item pairs to train.")
     
-    MODEL.train(X)
-    return {"trained": True, "samples": len(X), "features": FEATURE_NAMES}
+    MODEL.train(X, contamination=contamination)
+    return {"trained": True, "samples": len(X), "contamination": contamination, "features": FEATURE_NAMES}
 
 
 @router.get("/anomalies/lots", response_model=list[schemas.MLAnomalyResult])
