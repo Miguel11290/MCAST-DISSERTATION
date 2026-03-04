@@ -1,6 +1,7 @@
 class EvalRow {
   final int lotId;
   final int itemId;
+  final String itemName;
   final String baselineStatus;
   final List<String> baselineReasons;
   final bool? mlIsAnomaly;
@@ -10,6 +11,7 @@ class EvalRow {
   EvalRow({
     required this.lotId,
     required this.itemId,
+    required this.itemName,
     required this.baselineStatus,
     required this.baselineReasons,
     this.mlIsAnomaly,
@@ -21,6 +23,7 @@ class EvalRow {
     return EvalRow(
       lotId: json["lot_id"],
       itemId: json["item_id"],
+      itemName: json["item_name"] ?? "",
       baselineStatus: (json["baseline_status"] ?? "").toString(),
       baselineReasons:
           (json["baseline_reasons"] as List<dynamic>? ?? [])

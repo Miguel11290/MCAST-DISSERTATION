@@ -20,6 +20,7 @@ def get_db():
 class EvalRow(schemas.BaseModel):
     lot_id: int
     item_id: int
+    item_name: str
     baseline_status: str
     baseline_reasons: list[str]
     ml_is_anomaly: bool | None
@@ -71,6 +72,7 @@ def compare_baseline_vs_ml(db: Session = Depends(get_db)):
         results.append(EvalRow(
             lot_id=lot.id,
             item_id=item.id,
+            item_name=item.name,
             baseline_status=base.status,
             baseline_reasons=base.reasons,
             ml_is_anomaly=ml_is_anomaly,

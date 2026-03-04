@@ -27,4 +27,13 @@ class EvaluationApi {
       return MlMetrics.fromJson(data);
     });
   }
+
+  Future<void> trainMl({double contamination = 0.10}){
+    final url = Uri.parse('$baseUrl/ml/train?contamination=$contamination');
+    return http.post(url).then((res){
+      if(res.statusCode != 200){
+        throw Exception("Failed to train ML: ${res.statusCode} ${res.body}");
+      }
+    });
+  }
 }
