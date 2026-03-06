@@ -35,11 +35,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
       for (final r in rows) {
         final status = r.baselineStatus;
 
-        if (status == "SAFE") s++;
-        else if (status == "WARNING") w++;
-        else if (status == "UNSAFE") u++;
+        if (status == "SAFE"){
+          s++;
+        } 
+        else if (status == "WARNING"){
+          w++;
+        }
+        else if (status == "UNSAFE"){
+          u++;
+        } 
 
-        if (r.mlIsAnomaly == true) a++;
+        if (r.mlIsAnomaly == true){
+          a++;
+        } 
       }
 
       setState(() {
