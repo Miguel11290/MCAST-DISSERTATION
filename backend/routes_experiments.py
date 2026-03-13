@@ -79,3 +79,13 @@ def experiment_dataset_size(db: Session = Depends(get_db)):
         })
         
     return results
+
+@router.get("/export")
+def export_experiment_results(db: Session = Depends(get_db)):
+    contamination_results = experiment_contamination(db)
+    database_results = experiment_dataset_size(db)
+    
+    return{
+        "contamination_experiment": contamination_results,
+        "dataset_size_experiment": database_results
+    }

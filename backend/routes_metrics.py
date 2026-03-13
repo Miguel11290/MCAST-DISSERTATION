@@ -32,7 +32,7 @@ def ml_vs_baseline_metrics(db: Session = Depends(get_db)):
             continue
 
         base = evaluate_lot(lot, item)
-        y_true = (base.status == "UNSAFE") # proxy ground truth based on baseline
+        y_true = (base.status == "UNSAFE")  # proxy ground truth based on baseline
 
         feats = build_feature_vector(lot, item)
         label, score = MODEL.predict([feats])
@@ -51,15 +51,25 @@ def ml_vs_baseline_metrics(db: Session = Depends(get_db)):
     recall = TP / (TP + FN) if (TP + FN) else 0.0
     f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
     accuracy = (TP + TN) / (TP + TN + FP + FN) if (TP + TN + FP + FN) else 0.0
+    false_positive_rate = FP / (FP + TN) if (FP + TN) else 0.0
+    false_negative_rate = FN / (FN + TP) if (FN + TP) else 0.0
+    specificity = TN / (TN + FP) if (TN + FP) else 0.0
 
     return {
-        "TP": TP, "FP": FP, "TN": TN, "FN": FN,
+        "TP": TP,
+        "FP": FP,
+        "TN": TN,
+        "FN": FN,
         "precision": precision,
         "recall": recall,
         "f1_score": f1,
-        "accuracy": accuracy
+        "accuracy": accuracy,
+        "false_positive_rate": false_positive_rate,
+        "false_negative_rate": false_negative_rate,
+        "specificity": specificity
     }
-    
+
+
 @router.get("/roc-sweep")
 def roc_sweep(db: Session = Depends(get_db), points: int = 15):
     # Produces a ROC-like sweep by thresholding anomaly scores
@@ -82,6 +92,7 @@ def roc_sweep(db: Session = Depends(get_db), points: int = 15):
         
         feats = build_feature_vector(lot, item)
         label, score = MODEL.predict([feats])
+
         # score: higher normal -> invert to anomaly strength
         anomaly_strength.append(float(-score[0]))
         
@@ -105,8 +116,13 @@ def roc_sweep(db: Session = Depends(get_db), points: int = 15):
             elif gt == 1 and pred == 0:
                 FN += 1
                 
-        tpr = TP/(TP + FN) if (TP + FN) else 0.0
-        fpr = FP/(FP + TN) if (FP + TN) else 0.0
-        curve.append({"threshold": float(t), "TPR": float(tpr), "FPR": float(fpr)})
+        tpr = TP / (TP + FN) if (TP + FN) else 0.0
+        fpr = FP / (FP + TN) if (FP + TN) else 0.0
+
+        curve.append({
+            "threshold": float(t),
+            "TPR": float(tpr),
+            "FPR": float(fpr)
+        })
         
     return {"points": curve}

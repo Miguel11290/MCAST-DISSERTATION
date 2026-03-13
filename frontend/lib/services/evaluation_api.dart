@@ -36,4 +36,33 @@ class EvaluationApi {
       }
     });
   }
+
+  Future<List<dynamic>> getContaminationExperiment(){
+    return http.get(Uri.parse('$baseUrl/experiments/contamination')).then((res){
+      if(res.statusCode != 200){
+        throw Exception("Failed to fetch contamination experiment");
+      }
+      return jsonDecode(res.body) as List<dynamic>;
+    });
+  }
+
+  Future<List<dynamic>> getDatasetSizeExperiment(){
+    return http.get(Uri.parse('$baseUrl/experiments/dataset-size')).then((res){
+      if(res.statusCode != 200){
+        throw Exception("Failed to fetch dataset size experiment");
+      }
+      return jsonDecode(res.body) as List<dynamic>;
+    });
+  }
+
+  Future<List<dynamic>> getRocSweep(){
+    return http.get(Uri.parse('$baseUrl/metrics/roc-sweep')).then((res){
+      if(res.statusCode != 200){
+        throw Exception("Failed to fetch ROC sweep");
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+
+      return data["points"] ?? [];
+    });
+  }
 }
