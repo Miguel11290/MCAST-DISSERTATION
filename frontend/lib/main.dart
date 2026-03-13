@@ -3,6 +3,7 @@ import 'screens/items_list_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/anomalies_screen.dart';
 import 'screens/metrics_screen.dart';
+import 'screens/experiment_results_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,9 +14,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       title: 'Inventory & Safety Management System',
       home: HomeShell(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -35,9 +37,16 @@ class _HomeShellState extends State<HomeShell> {
     DashboardScreen(),
     AnomaliesScreen(),
     MetricsScreen(),
+    ExperimentResultsScreen(),
   ];
 
-  final _titles = const ["Items", "Dashboard", "Anomalies", "Metrics"];
+  final _titles = const [
+    "Items",
+    "Dashboard",
+    "Anomalies",
+    "Metrics",
+    "Experiments",
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +73,10 @@ class _HomeShellState extends State<HomeShell> {
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
             label: "Metrics",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.science),
+            label: "Experiments",
           ),
         ],
       ),
