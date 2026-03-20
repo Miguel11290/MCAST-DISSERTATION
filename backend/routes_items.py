@@ -21,6 +21,7 @@ def create_item(item: schemas.ItemCreate, db: Session = Depends(get_db)):
         hazard_class = item.hazard_class,
         unit = item.unit,
         max_safe_quantity = item.max_safe_quantity,
+        storage_group = item.storage_group
     )
     db.add(db_item)
     db.commit()
@@ -54,7 +55,8 @@ def update_item(item_id: int, payload: schemas.ItemUpdate, db: Session = Depends
         item.unit = payload.unit
     if payload.max_safe_quantity is not None:
         item.max_safe_quantity = payload.max_safe_quantity
-
+    if payload.storage_group is not None:
+        item.storage_group = payload.storage_group
     db.commit()
     db.refresh(item)
     return item

@@ -11,6 +11,7 @@ class Item(Base):
     hazard_class = Column(String, nullable=True)
     unit = Column(String, nullable=True)
     max_safe_quantity = Column(Float, nullable=True)
+    storage_group = Column(String, nullable=True)
 
 
 class InventoryLot(Base):

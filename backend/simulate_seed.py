@@ -4,36 +4,38 @@ from database import SessionLocal, Base, engine
 import models
 
 # Realistic item names found in fireworks manufacturing (NO recipes)
+# Format:
+# (name, hazard_class, storage_group, max_safe_quantity)
 REAL_ITEMS = [
     # Oxidizers
-    ("Potassium Nitrate", "oxidizer", 75),
-    ("Potassium Perchlorate", "oxidizer", 60),
-    ("Barium Nitrate", "oxidizer", 50),
-    ("Strontium Nitrate", "oxidizer", 50),
-    ("Sodium Nitrate", "oxidizer", 70),
+    ("Potassium Nitrate", "oxidizer", "oxidizer", 75),
+    ("Potassium Perchlorate", "oxidizer", "oxidizer", 60),
+    ("Barium Nitrate", "oxidizer", "oxidizer", 50),
+    ("Strontium Nitrate", "oxidizer", "oxidizer", 50),
+    ("Sodium Nitrate", "oxidizer", "oxidizer", 70),
 
-    # Fuels / Metals
-    ("Aluminum Powder", "fuel", 40),
-    ("Magnesium Powder", "fuel", 35),
-    ("Charcoal", "fuel", 90),
-    ("Sulfur", "fuel", 80),
-    ("Titanium Granules", "fuel", 45),
+    # Fuels / reactive powders
+    ("Aluminum Powder", "fuel", "metal_powder", 40),
+    ("Magnesium Powder", "fuel", "metal_powder", 35),
+    ("Charcoal", "fuel", "fuel", 90),
+    ("Sulfur", "fuel", "fuel", 80),
+    ("Titanium Granules", "fuel", "metal_powder", 45),
 
-    # Binders / Additives
-    ("Dextrin", "binder", 120),
-    ("Red Gum", "binder", 120),
-    ("Parlon (Chlorinated Rubber)", "binder", 100),
+    # Binders / additives
+    ("Dextrin", "binder", "binder", 120),
+    ("Red Gum", "binder", "binder", 120),
+    ("Parlon (Chlorinated Rubber)", "binder", "binder", 100),
 
-    # Other common materials / salts (still safe to name)
-    ("Copper(II) Chloride", "color_agent", 30),
-    ("Calcium Chloride", "other", 40),
-    ("Strontium Carbonate", "color_agent", 40),
+    # Other common materials / salts
+    ("Copper(II) Chloride", "color_agent", "color_agent", 30),
+    ("Calcium Chloride", "other", "other", 40),
+    ("Strontium Carbonate", "color_agent", "color_agent", 40),
 
-    # Packaging / components (for variety)
-    ("Paper Tubes", "binder", 200),
-    ("Fuse (Safety Fuse)", "binder", 150),
-    ("Clay (Bentonite)", "binder", 250),
-    ("Dextrin-Coated Rice Hulls", "binder", 120),
+    # Packaging / components
+    ("Paper Tubes", "binder", "other", 200),
+    ("Fuse (Safety Fuse)", "binder", "other", 150),
+    ("Clay (Bentonite)", "binder", "other", 250),
+    ("Dextrin-Coated Rice Hulls", "binder", "binder", 120),
 ]
 
 LOCATIONS = ["Store A", "Store B", "Store C", "Bay 1", "Bay 2"]
@@ -50,6 +52,8 @@ def sample_normal_quantity(hazard_class: str, max_safe: float | None) -> float:
         qty = random.uniform(2, 35)
     elif hazard_class == "binder":
         qty = random.uniform(10, 120)
+    elif hazard_class == "color_agent":
+        qty = random.uniform(2, 25)
     elif hazard_class == "explosive":
         qty = random.uniform(1, 20)
     else:
@@ -60,6 +64,54 @@ def sample_normal_quantity(hazard_class: str, max_safe: float | None) -> float:
         qty = random.uniform(0.4 * max_safe, 0.9 * max_safe)
 
     return float(qty)
+
+
+def inject_incompatible_pairs(db, items, n_pairs=15):
+    """
+    Injects deliberate incompatible co-storage scenarios
+    so the safety rules can detect them and ML can learn
+    that these cases are unusual.
+    """
+    oxidizers = [i for i in items if i.storage_group == "oxidizer"]
+    fuels = [i for i in items if i.storage_group == "fuel"]
+    metal_powders = [i for i in items if i.storage_group == "metal_powder"]
+
+    pair_templates = [
+        (oxidizers, fuels),
+        (oxidizers, metal_powders),
+    ]
+
+    for _ in range(n_pairs):
+        left_group, right_group = random.choice(pair_templates)
+
+        if not left_group or not right_group:
+            continue
+
+        item1 = random.choice(left_group)
+        item2 = random.choice(right_group)
+
+        location = random.choice(LOCATIONS)
+        received_at = datetime.utcnow() - timedelta(days=random.randint(0, 20))
+
+        qty1 = sample_normal_quantity(item1.hazard_class or "", item1.max_safe_quantity)
+        qty2 = sample_normal_quantity(item2.hazard_class or "", item2.max_safe_quantity)
+
+        lot1 = models.InventoryLot(
+            item_id=item1.id,
+            quantity=float(qty1),
+            location=location,
+            received_at=received_at
+        )
+
+        lot2 = models.InventoryLot(
+            item_id=item2.id,
+            quantity=float(qty2),
+            location=location,
+            received_at=received_at
+        )
+
+        db.add(lot1)
+        db.add(lot2)
 
 
 def run(n_items=20, n_lots=300):
@@ -75,11 +127,12 @@ def run(n_items=20, n_lots=300):
     selected = REAL_ITEMS[:n_items] if n_items <= len(REAL_ITEMS) else REAL_ITEMS
 
     # Create items
-    for name, hazard, max_safe in selected:
+    for name, hazard, storage_group, max_safe in selected:
         item = models.Item(
             name=name,
             description="Simulated industrial component (synthetic dataset)",
             hazard_class=hazard,
+            storage_group=storage_group,
             unit="kg",
             max_safe_quantity=float(max_safe) if max_safe is not None else None
         )
@@ -88,7 +141,7 @@ def run(n_items=20, n_lots=300):
 
     items = db.query(models.Item).all()
 
-    # Create lots
+    # Create normal + quantity anomaly lots
     for _ in range(n_lots):
         item = random.choice(items)
         loc = random.choice(LOCATIONS)
@@ -111,7 +164,6 @@ def run(n_items=20, n_lots=300):
         elif scenario < 0.20:
             qty = float(random.uniform(120, 250))
 
-        # Create the lot
         lot = models.InventoryLot(
             item_id=item.id,
             quantity=float(qty),
@@ -121,8 +173,15 @@ def run(n_items=20, n_lots=300):
         db.add(lot)
 
     db.commit()
+
+    # Inject compatibility anomalies after normal data
+    inject_incompatible_pairs(db, items, n_pairs=15)
+
+    db.commit()
+    total_lots = db.query(models.InventoryLot).count()
     db.close()
-    print(f"Created {len(items)} items and {n_lots} simulated lots.")
+
+    print(f"Created {len(items)} items and {total_lots} simulated lots.")
 
 
 if __name__ == "__main__":

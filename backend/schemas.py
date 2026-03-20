@@ -8,16 +8,19 @@ class ItemCreate(BaseModel):
     hazard_class: Optional[str] = None
     unit: Optional[str] = None
     max_safe_quantity: Optional[float] = None # week 3 addition
+    storage_group: Optional[str] = None # week 3 addition
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     hazard_class: Optional[str] = None
     unit: Optional[str] = None
-    max_safe_quantity: Optional[float] = None  
+    max_safe_quantity: Optional[float] = None
+    storage_group: Optional[str] = None
 
 class ItemRead(ItemCreate):
     id: int
+    storage_group: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -48,6 +51,8 @@ class SafetyCheckResult(BaseModel):
     max_safe_quantity: float | None = None
     received_at: datetime
     storage_days: int
+    conflicting_lots_ids: list[int] = []
+    location: str | None = None
 
     class Config:
         orm_mode = True
