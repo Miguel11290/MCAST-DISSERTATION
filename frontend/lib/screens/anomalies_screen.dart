@@ -56,12 +56,18 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
 
     return rows.where((r) {
       final signals = (r.mlSignals ?? []).join(" ").toLowerCase();
+      final conflictsText = (r.conflictingLotIds ?? []).join(" ").toLowerCase();
 
       return signals.contains(qq) ||
           r.baselineStatus.toLowerCase().contains(qq) ||
           r.lotId.toString().contains(qq) ||
           r.itemId.toString().contains(qq) ||
-          r.itemName.toLowerCase().contains(qq);
+          r.itemName.toLowerCase().contains(qq) ||
+          (r.location ?? "").toLowerCase().contains(qq) ||
+          conflictsText.contains(qq) ||
+          (qq.contains("conflict") &&
+              r.conflictingLotIds != null &&
+              r.conflictingLotIds!.isNotEmpty);
     }).toList();
   }
 
@@ -91,6 +97,19 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
         });
   }
 
+  Color _rowColor(EvalRow r) {
+    final hasConflict =
+        r.conflictingLotIds != null && r.conflictingLotIds!.isNotEmpty;
+
+    if (hasConflict || r.baselineStatus == "UNSAFE") {
+      return Colors.red.withValues(alpha: 0.08);
+    }
+    if (r.baselineStatus == "WARNING") {
+      return Colors.orange.withValues(alpha: 0.08);
+    }
+    return Colors.transparent;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: CircularProgressIndicator());
@@ -99,29 +118,26 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          /// Top bar
           Row(
             children: [
               Expanded(
                 child: TextField(
                   onChanged: _onSearch,
                   decoration: const InputDecoration(
-                    labelText: "Search anomalies (signals/status/id/name)",
+                    labelText:
+                        "Search anomalies (item, location, conflict, signal...)",
                     prefixIcon: Icon(Icons.search),
                     border: OutlineInputBorder(),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
-
               ElevatedButton.icon(
                 onPressed: _load,
                 icon: const Icon(Icons.refresh),
                 label: const Text("Refresh"),
               ),
-
               const SizedBox(width: 12),
-
               OutlinedButton.icon(
                 onPressed: _trainAndReload,
                 icon: const Icon(Icons.model_training),
@@ -129,24 +145,22 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
 
-          /// Error message
           if (error != null)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                border: Border.all(),
+                border: Border.all(color: Colors.red.shade300),
                 borderRadius: BorderRadius.circular(12),
+                color: Colors.red.shade50,
               ),
               child: Text(error!),
             ),
 
           const SizedBox(height: 12),
 
-          /// Table
           if (filtered.isEmpty)
             const Expanded(
               child: Center(
@@ -163,31 +177,41 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
                   child: DataTable(
                     columns: const [
                       DataColumn(label: Text("Lot")),
-                      DataColumn(label: Text("Item")),
+                      DataColumn(label: Text("Item ID")),
                       DataColumn(label: Text("Item Name")),
+                      DataColumn(label: Text("Location")),
                       DataColumn(label: Text("Score")),
                       DataColumn(label: Text("Baseline")),
+                      DataColumn(label: Text("Conflicts")),
                       DataColumn(label: Text("Signals")),
                     ],
                     rows:
                         filtered.map((r) {
+                          final hasConflict =
+                              r.conflictingLotIds != null &&
+                              r.conflictingLotIds!.isNotEmpty;
+
                           return DataRow(
+                            color: WidgetStateProperty.all(_rowColor(r)),
                             cells: [
                               DataCell(Text("${r.lotId}")),
-
                               DataCell(Text("${r.itemId}")),
-
                               DataCell(Text(r.itemName)),
-
+                              DataCell(Text(r.location ?? "-")),
                               DataCell(
                                 Text(r.mlScore?.toStringAsFixed(4) ?? ""),
                               ),
-
                               DataCell(_statusChip(r.baselineStatus)),
-
+                              DataCell(
+                                hasConflict
+                                    ? Text(
+                                      "⚠ ${r.conflictingLotIds!.join(", ")}",
+                                    )
+                                    : const Text("-"),
+                              ),
                               DataCell(
                                 SizedBox(
-                                  width: 520,
+                                  width: 540,
                                   child: Text(
                                     (r.mlSignals ?? []).join(" | "),
                                     softWrap: true,

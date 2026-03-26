@@ -2,6 +2,8 @@ class EvalRow {
   final int lotId;
   final int itemId;
   final String itemName;
+  final String? location;
+  final List<int>? conflictingLotIds;
   final String baselineStatus;
   final List<String> baselineReasons;
   final bool? mlIsAnomaly;
@@ -17,6 +19,8 @@ class EvalRow {
     this.mlIsAnomaly,
     this.mlScore,
     this.mlSignals,
+    this.location,
+    this.conflictingLotIds,
   });
 
   factory EvalRow.fromJson(Map<String, dynamic> json) {
@@ -24,6 +28,11 @@ class EvalRow {
       lotId: json["lot_id"],
       itemId: json["item_id"],
       itemName: json["item_name"] ?? "",
+      location: json["location"],
+      conflictingLotIds:
+          json["conflicting_lot_ids"] != null
+              ? List<int>.from(json["conflicting_lot_ids"])
+              : [],
       baselineStatus: (json["baseline_status"] ?? "").toString(),
       baselineReasons:
           (json["baseline_reasons"] as List<dynamic>? ?? [])

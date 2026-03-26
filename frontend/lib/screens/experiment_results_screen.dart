@@ -81,13 +81,21 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
         });
   }
 
-  Widget _metricCard(String title, String value) {
+  Widget _metricCard(String title, String value, {Color? color}) {
     return Container(
       width: 220,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(),
-        borderRadius: BorderRadius.circular(12),
+        color: color ?? Colors.grey.shade50,
+        border: Border.all(color: Colors.black12),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 6,
+            offset: Offset(0, 2),
+            color: Color(0x11000000),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +105,10 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 24)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
@@ -112,19 +123,41 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
       spacing: 12,
       runSpacing: 12,
       children: [
-        _metricCard("Precision", metrics!.precision.toStringAsFixed(3)),
-        _metricCard("Recall", metrics!.recall.toStringAsFixed(3)),
-        _metricCard("F1 Score", metrics!.f1.toStringAsFixed(3)),
-        _metricCard("Accuracy", metrics!.accuracy.toStringAsFixed(3)),
+        _metricCard(
+          "Precision",
+          metrics!.precision.toStringAsFixed(3),
+          color: Colors.blue.shade50,
+        ),
+        _metricCard(
+          "Recall",
+          metrics!.recall.toStringAsFixed(3),
+          color: Colors.green.shade50,
+        ),
+        _metricCard(
+          "F1 Score",
+          metrics!.f1.toStringAsFixed(3),
+          color: Colors.purple.shade50,
+        ),
+        _metricCard(
+          "Accuracy",
+          metrics!.accuracy.toStringAsFixed(3),
+          color: Colors.teal.shade50,
+        ),
         _metricCard(
           "False Positive Rate",
           metrics!.falsePositiveRate.toStringAsFixed(3),
+          color: Colors.orange.shade50,
         ),
         _metricCard(
           "False Negative Rate",
           metrics!.falseNegativeRate.toStringAsFixed(3),
+          color: Colors.red.shade50,
         ),
-        _metricCard("Specificity", metrics!.specificity.toStringAsFixed(3)),
+        _metricCard(
+          "Specificity",
+          metrics!.specificity.toStringAsFixed(3),
+          color: Colors.indigo.shade50,
+        ),
         _metricCard("TP / FP", "${metrics!.tp} / ${metrics!.fp}"),
         _metricCard("TN / FN", "${metrics!.tn} / ${metrics!.fn}"),
       ],
@@ -164,6 +197,27 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
     );
   }
 
+  Widget _buildRocChart() {
+    if (rocPoints.isEmpty) {
+      return const Text("No ROC-style data available.");
+    }
+
+    return Container(
+      width: double.infinity,
+      height: 280,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black12),
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+      ),
+      child: CustomPaint(
+        painter: RocChartPainter(rocPoints),
+        child: Container(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -196,8 +250,9 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                border: Border.all(),
+                border: Border.all(color: Colors.red.shade300),
                 borderRadius: BorderRadius.circular(12),
+                color: Colors.red.shade50,
               ),
               child: Text(error!),
             ),
@@ -219,7 +274,20 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
                   const SizedBox(height: 24),
 
                   const Text(
-                    "ROC-Style Threshold Sweep",
+                    "ROC Curve",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "This chart shows the trade-off between true positive rate and false positive rate across thresholds.",
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRocChart(),
+
+                  const SizedBox(height: 24),
+
+                  const Text(
+                    "ROC-Style Threshold Sweep Table",
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -232,4 +300,105 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
       ),
     );
   }
+}
+
+class RocChartPainter extends CustomPainter {
+  final List<dynamic> points;
+
+  RocChartPainter(this.points);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double leftPad = 40;
+    const double bottomPad = 30;
+    const double topPad = 10;
+    const double rightPad = 10;
+
+    final chartWidth = size.width - leftPad - rightPad;
+    final chartHeight = size.height - topPad - bottomPad;
+
+    final axisPaint =
+        Paint()
+          ..color = Colors.black87
+          ..strokeWidth = 1.5;
+
+    final linePaint =
+        Paint()
+          ..color = Colors.blue
+          ..strokeWidth = 2.5
+          ..style = PaintingStyle.stroke;
+
+    final diagPaint =
+        Paint()
+          ..color = Colors.grey
+          ..strokeWidth = 1.5
+          ..style = PaintingStyle.stroke;
+
+    final pointPaint =
+        Paint()
+          ..color = Colors.red
+          ..style = PaintingStyle.fill;
+
+    // axes
+    canvas.drawLine(
+      Offset(leftPad, topPad),
+      Offset(leftPad, topPad + chartHeight),
+      axisPaint,
+    );
+    canvas.drawLine(
+      Offset(leftPad, topPad + chartHeight),
+      Offset(leftPad + chartWidth, topPad + chartHeight),
+      axisPaint,
+    );
+
+    // diagonal reference
+    canvas.drawLine(
+      Offset(leftPad, topPad + chartHeight),
+      Offset(leftPad + chartWidth, topPad),
+      diagPaint,
+    );
+
+    final parsed =
+        points.map((p) {
+          final fpr = ((p["FPR"] ?? p["fpr"]) as num?)?.toDouble() ?? 0.0;
+          final tpr = ((p["TPR"] ?? p["tpr"]) as num?)?.toDouble() ?? 0.0;
+          return Offset(
+            leftPad + fpr * chartWidth,
+            topPad + chartHeight - (tpr * chartHeight),
+          );
+        }).toList();
+
+    if (parsed.length > 1) {
+      final path = Path()..moveTo(parsed.first.dx, parsed.first.dy);
+      for (final pt in parsed.skip(1)) {
+        path.lineTo(pt.dx, pt.dy);
+      }
+      canvas.drawPath(path, linePaint);
+    }
+
+    for (final pt in parsed) {
+      canvas.drawCircle(pt, 3.2, pointPaint);
+    }
+
+    final textStyle = const TextStyle(fontSize: 11, color: Colors.black87);
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+
+    void drawText(String text, Offset offset) {
+      tp.text = TextSpan(text: text, style: textStyle);
+      tp.layout();
+      tp.paint(canvas, offset);
+    }
+
+    drawText("TPR", const Offset(4, 4));
+    drawText(
+      "FPR",
+      Offset(leftPad + chartWidth - 20, topPad + chartHeight + 6),
+    );
+    drawText("0.0", Offset(leftPad - 12, topPad + chartHeight + 4));
+    drawText("1.0", Offset(leftPad + chartWidth - 8, topPad + chartHeight + 4));
+    drawText("1.0", Offset(8, topPad - 2));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

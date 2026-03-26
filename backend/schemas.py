@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 
 class ItemCreate(BaseModel):
@@ -20,8 +20,6 @@ class ItemUpdate(BaseModel):
 
 class ItemRead(ItemCreate):
     id: int
-    storage_group: Optional[str] = None
-
     class Config:
         orm_mode = True
         from_attributes = True
@@ -51,8 +49,8 @@ class SafetyCheckResult(BaseModel):
     max_safe_quantity: float | None = None
     received_at: datetime
     storage_days: int
-    conflicting_lots_ids: list[int] = []
     location: str | None = None
+    conflicting_lot_ids: list[int] = []
 
     class Config:
         orm_mode = True
