@@ -18,6 +18,7 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
 
   MlMetrics? metrics;
   List<dynamic> rocPoints = [];
+  Map<String, dynamic>? confusionMatrix;
 
   @override
   void initState() {
@@ -26,6 +27,8 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
   }
 
   void _load() {
+    if (!mounted) return;
+
     setState(() {
       loading = true;
       error = null;
@@ -37,25 +40,49 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
           api
               .getRocSweep()
               .then((roc) {
-                setState(() {
-                  metrics = m;
-                  rocPoints = roc;
-                  loading = false;
-                });
+                api
+                    .getConfusionMatrix()
+                    .then((cm) {
+                      if (!mounted) return;
+
+                      setState(() {
+                        metrics = m;
+                        rocPoints = roc;
+                        confusionMatrix = cm;
+                        loading = false;
+                      });
+                    })
+                    .catchError((e) {
+                      if (!mounted) return;
+
+                      setState(() {
+                        metrics = m;
+                        rocPoints = roc;
+                        confusionMatrix = null;
+                        error = e.toString();
+                        loading = false;
+                      });
+                    });
               })
               .catchError((e) {
+                if (!mounted) return;
+
                 setState(() {
                   metrics = m;
                   rocPoints = [];
+                  confusionMatrix = null;
                   error = e.toString();
                   loading = false;
                 });
               });
         })
         .catchError((e) {
+          if (!mounted) return;
+
           setState(() {
             metrics = null;
             rocPoints = [];
+            confusionMatrix = null;
             error = e.toString();
             loading = false;
           });
@@ -63,6 +90,8 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
   }
 
   void _trainMl() {
+    if (!mounted) return;
+
     setState(() {
       loading = true;
       error = null;
@@ -71,9 +100,12 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
     api
         .trainMl(contamination: 0.10)
         .then((_) {
+          if (!mounted) return;
           _load();
         })
         .catchError((e) {
+          if (!mounted) return;
+
           setState(() {
             error = e.toString();
             loading = false;
@@ -143,24 +175,131 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
           metrics!.accuracy.toStringAsFixed(3),
           color: Colors.teal.shade50,
         ),
-        _metricCard(
-          "False Positive Rate",
-          metrics!.falsePositiveRate.toStringAsFixed(3),
-          color: Colors.orange.shade50,
-        ),
-        _metricCard(
-          "False Negative Rate",
-          metrics!.falseNegativeRate.toStringAsFixed(3),
-          color: Colors.red.shade50,
-        ),
-        _metricCard(
-          "Specificity",
-          metrics!.specificity.toStringAsFixed(3),
-          color: Colors.indigo.shade50,
-        ),
         _metricCard("TP / FP", "${metrics!.tp} / ${metrics!.fp}"),
         _metricCard("TN / FN", "${metrics!.tn} / ${metrics!.fn}"),
       ],
+    );
+  }
+
+  Widget _buildConfusionMatrix() {
+    if (confusionMatrix == null || confusionMatrix!["matrix"] == null) {
+      return const Text("No confusion matrix available.");
+    }
+
+    final matrix = confusionMatrix!["matrix"] as Map<String, dynamic>;
+    final tp = matrix["TP"] ?? 0;
+    final fp = matrix["FP"] ?? 0;
+    final tn = matrix["TN"] ?? 0;
+    final fn = matrix["FN"] ?? 0;
+
+    Widget cell(String title, dynamic value, Color color) {
+      return Container(
+        width: 160,
+        height: 100,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color,
+          border: Border.all(color: Colors.black12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+              "$value",
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Rows = Actual, Columns = Predicted",
+          style: TextStyle(fontSize: 14),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            const SizedBox(width: 90),
+            const SizedBox(
+              width: 160,
+              child: Center(
+                child: Text(
+                  "Predicted Unsafe",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const SizedBox(
+              width: 160,
+              child: Center(
+                child: Text(
+                  "Predicted Safe",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            const SizedBox(
+              width: 90,
+              child: Text(
+                "Actual Unsafe",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            cell("TP", tp, Colors.green.shade100),
+            const SizedBox(width: 12),
+            cell("FN", fn, Colors.orange.shade100),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            const SizedBox(
+              width: 90,
+              child: Text(
+                "Actual Safe",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            cell("FP", fp, Colors.red.shade100),
+            const SizedBox(width: 12),
+            cell("TN", tn, Colors.blue.shade100),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRocChart() {
+    if (rocPoints.isEmpty) {
+      return const Text("No ROC-style data available.");
+    }
+
+    return Container(
+      width: double.infinity,
+      height: 300,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black12),
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+      ),
+      child: CustomPaint(
+        painter: RocChartPainter(rocPoints),
+        child: Container(),
+      ),
     );
   }
 
@@ -193,27 +332,6 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
                 ],
               );
             }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildRocChart() {
-    if (rocPoints.isEmpty) {
-      return const Text("No ROC-style data available.");
-    }
-
-    return Container(
-      width: double.infinity,
-      height: 280,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.white,
-      ),
-      child: CustomPaint(
-        painter: RocChartPainter(rocPoints),
-        child: Container(),
       ),
     );
   }
@@ -270,6 +388,15 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildMetricsSection(),
+
+                  const SizedBox(height: 24),
+
+                  const Text(
+                    "Confusion Matrix",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildConfusionMatrix(),
 
                   const SizedBox(height: 24),
 
@@ -339,7 +466,6 @@ class RocChartPainter extends CustomPainter {
           ..color = Colors.red
           ..style = PaintingStyle.fill;
 
-    // axes
     canvas.drawLine(
       Offset(leftPad, topPad),
       Offset(leftPad, topPad + chartHeight),
@@ -351,7 +477,6 @@ class RocChartPainter extends CustomPainter {
       axisPaint,
     );
 
-    // diagonal reference
     canvas.drawLine(
       Offset(leftPad, topPad + chartHeight),
       Offset(leftPad + chartWidth, topPad),

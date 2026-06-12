@@ -100,14 +100,16 @@ def inject_incompatible_pairs(db, items, n_pairs=15):
             item_id=item1.id,
             quantity=float(qty1),
             location=location,
-            received_at=received_at
+            received_at=received_at,
+            scenario_type="compatibility_conflict"
         )
 
         lot2 = models.InventoryLot(
             item_id=item2.id,
             quantity=float(qty2),
             location=location,
-            received_at=received_at
+            received_at=received_at,
+            scenario_type="compatibility_conflict"
         )
 
         db.add(lot1)
@@ -154,21 +156,25 @@ def run(n_items=20, n_lots=300):
         qty = sample_normal_quantity(item.hazard_class or "", item.max_safe_quantity)
 
         # Inject anomalies (good for evaluation)
+        scenario_type = "normal"
         scenario = random.random()
 
         # 10%: overstock beyond max safe quantity
         if scenario < 0.10 and item.max_safe_quantity:
             qty = float(item.max_safe_quantity * random.uniform(1.1, 2.0))
+            scenario_type = "overstock"
 
         # next 10%: extreme outlier quantity (pure anomaly)
         elif scenario < 0.20:
             qty = float(random.uniform(120, 250))
+            scenario_type = "extreme_quantity"
 
         lot = models.InventoryLot(
             item_id=item.id,
             quantity=float(qty),
             location=loc,
-            received_at=received_at
+            received_at=received_at,
+            scenario_type=scenario_type
         )
         db.add(lot)
 

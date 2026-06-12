@@ -22,3 +22,4 @@ class InventoryLot(Base):
     quantity = Column(Float, nullable=False)
     location = Column(String, nullable=True)
     received_at = Column(DateTime, default=datetime.utcnow)
+    scenario_type = Column(String, nullable=True)

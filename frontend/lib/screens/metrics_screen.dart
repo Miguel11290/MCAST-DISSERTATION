@@ -25,6 +25,8 @@ class _MetricsScreenState extends State<MetricsScreen> {
   }
 
   void _load() {
+    if(!mounted) return;
+
     setState(() {
       loading = true;
       error = null;
@@ -32,6 +34,8 @@ class _MetricsScreenState extends State<MetricsScreen> {
     });
 
     api.getMlVsBaselineMetrics().then((metrics) {
+      if(!mounted) return;
+
       setState(() {
         m = metrics;
         loading = false;
@@ -42,6 +46,8 @@ class _MetricsScreenState extends State<MetricsScreen> {
       // If backend returns 400, you usually need to train ML first.
       // The EvaluationApi throws exceptions containing the status/body.
       final is400 = msg.contains(" 400") || msg.contains("statusCode: 400") || msg.contains("400");
+
+      if(!mounted) return;
 
       setState(() {
         m = null;
@@ -55,6 +61,8 @@ class _MetricsScreenState extends State<MetricsScreen> {
   }
 
   void _trainMl() {
+    if(!mounted) return;
+    
     setState(() {
       loading = true;
       error = null;
@@ -63,6 +71,8 @@ class _MetricsScreenState extends State<MetricsScreen> {
     api.trainMl(contamination: 0.10).then((_) {
       _load();
     }).catchError((e) {
+      if(!mounted) return;
+      
       setState(() {
         loading = false;
         error = e.toString();

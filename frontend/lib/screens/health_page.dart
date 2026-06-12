@@ -22,11 +22,15 @@ class _HealthPageState extends State<HealthPage> {
     apiService
         .getHealth()
         .then((health) {
+          if (!mounted) return;
+
           setState(() {
             statusText = "API Status: ${health.status}";
           });
         })
         .catchError((error) {
+          if (!mounted) return;
+          
           setState(() {
             statusText = "API Error: $error";
           });

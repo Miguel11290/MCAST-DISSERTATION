@@ -30,6 +30,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _load() {
+    if (!mounted) return;
+
     setState(() {
       loading = true;
       error = null;
@@ -64,6 +66,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
           }
 
+          if (!mounted) return;
+
           setState(() {
             totalLots = total;
             safe = s;
@@ -76,6 +80,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           });
         })
         .catchError((e) {
+          if (!mounted) return;
+
           setState(() {
             error = e.toString();
             loading = false;
@@ -182,7 +188,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-
                   const Text(
                     "Summary",
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),

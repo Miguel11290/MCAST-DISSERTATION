@@ -35,6 +35,7 @@ class InventoryLotRead(BaseModel):
     quantity: float
     location: Optional[str] = None
     received_at: datetime
+    scenario_type: str | None = None
 
     class Config:
         orm_mode = True
@@ -51,6 +52,7 @@ class SafetyCheckResult(BaseModel):
     storage_days: int
     location: str | None = None
     conflicting_lot_ids: list[int] = []
+    scenario_type: str | None = None
 
     class Config:
         orm_mode = True

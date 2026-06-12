@@ -20,12 +20,16 @@ class _ItemsListScreenState extends State<ItemsListScreen> {
     super.initState();
     api.fetchItems(
       onSuccess: (data) {
+        if(!mounted) return;
+
         setState(() {
           items = data;
           loading = false;
         });
       },
       onError: (msg) {
+        if(!mounted) return;
+        
         setState(() {
           error = msg;
           loading = false;

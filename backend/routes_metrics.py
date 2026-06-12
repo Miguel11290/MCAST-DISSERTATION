@@ -126,3 +126,42 @@ def roc_sweep(db: Session = Depends(get_db), points: int = 15):
         })
         
     return {"points": curve}
+
+@router.get("/confusion-matrix")
+def confusion_matrix(db: Session = Depends(get_db)):
+    if not MODEL.is_trained:
+        raise HTTPException(status_code=400, detail="Train ML first: POST /ml/train")
+    
+    lots = db.query(models.InventoryLot).all()
+    
+    TP = FP = TN = FN = 0
+    
+    for lot in lots:
+        item = db.query(models.Item).filter(models.Item.id == lot.item_id).first()
+        if not item:
+            continue
+        
+        base = evaluate_lot(lot, item)
+        y_true = (base.status == "UNSAFE")  # proxy ground truth based on baseline
+        
+        feats = build_feature_vector(lot, item)
+        labels, scores = MODEL.predict([feats])
+        y_pred = (labels[0] == -1)
+        
+        if(y_true and y_pred):
+            TP += 1
+        elif(not y_true) and y_pred:
+            FP += 1
+        elif(not y_true) and (not y_pred):
+            TN += 1
+        elif(y_true and (not y_pred)):
+            FN += 1
+        
+    return{
+        "matrix":{
+            "TP": TP,
+            "FP": FP,
+            "TN": TN,
+            "FN": FN
+        }
+    }

@@ -27,6 +27,8 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
   }
 
   void _load() {
+    if(!mounted) return;
+
     setState(() {
       loading = true;
       error = null;
@@ -36,6 +38,9 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
         .getEvalLots()
         .then((data) {
           final only = data.where((r) => r.mlIsAnomaly == true).toList();
+
+          if (!mounted) return;
+
           setState(() {
             all = only;
             filtered = _applyFilter(only, query);
@@ -43,6 +48,8 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
           });
         })
         .catchError((e) {
+          if (!mounted) return;
+
           setState(() {
             error = e.toString();
             loading = false;
@@ -72,6 +79,8 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
   }
 
   void _onSearch(String v) {
+    if (!mounted) return;
+
     setState(() {
       query = v;
       filtered = _applyFilter(all, v);
@@ -79,6 +88,8 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
   }
 
   void _trainAndReload() {
+    if(!mounted) return;
+
     setState(() {
       loading = true;
       error = null;
@@ -90,6 +101,8 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
           _load();
         })
         .catchError((e) {
+          if(!mounted) return;
+          
           setState(() {
             error = e.toString();
             loading = false;
