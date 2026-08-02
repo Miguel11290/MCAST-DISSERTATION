@@ -25,7 +25,7 @@ class _MetricsScreenState extends State<MetricsScreen> {
   }
 
   void _load() {
-    if(!mounted) return;
+    if (!mounted) return;
 
     setState(() {
       loading = true;
@@ -33,51 +33,61 @@ class _MetricsScreenState extends State<MetricsScreen> {
       needsTraining = false;
     });
 
-    api.getMlVsBaselineMetrics().then((metrics) {
-      if(!mounted) return;
+    api
+        .getMlVsBaselineMetrics()
+        .then((metrics) {
+          if (!mounted) return;
 
-      setState(() {
-        m = metrics;
-        loading = false;
-      });
-    }).catchError((e) {
-      final msg = e.toString();
+          setState(() {
+            m = metrics;
+            loading = false;
+          });
+        })
+        .catchError((e) {
+          final msg = e.toString();
 
-      // If backend returns 400, you usually need to train ML first.
-      // The EvaluationApi throws exceptions containing the status/body.
-      final is400 = msg.contains(" 400") || msg.contains("statusCode: 400") || msg.contains("400");
+          // If backend returns 400, you usually need to train ML first.
+          // The EvaluationApi throws exceptions containing the status/body.
+          final is400 =
+              msg.contains(" 400") ||
+              msg.contains("statusCode: 400") ||
+              msg.contains("400");
 
-      if(!mounted) return;
+          if (!mounted) return;
 
-      setState(() {
-        m = null;
-        loading = false;
-        needsTraining = is400;
-        error = is400
-            ? "Metrics not available yet. Train the ML model first, then refresh."
-            : msg;
-      });
-    });
+          setState(() {
+            m = null;
+            loading = false;
+            needsTraining = is400;
+            error =
+                is400
+                    ? "Metrics not available yet. Train the ML model first, then refresh."
+                    : msg;
+          });
+        });
   }
 
   void _trainMl() {
-    if(!mounted) return;
-    
+    if (!mounted) return;
+
     setState(() {
       loading = true;
       error = null;
     });
 
-    api.trainMl(contamination: 0.10).then((_) {
-      _load();
-    }).catchError((e) {
-      if(!mounted) return;
-      
-      setState(() {
-        loading = false;
-        error = e.toString();
-      });
-    });
+    api
+        .trainMl(contamination: 0.10)
+        .then((_) {
+          _load();
+        })
+        .catchError((e) {
+          if (!mounted) return;
+
+          setState(() {
+            loading = false;
+            error = e.toString();
+          });
+        });
   }
 
   @override

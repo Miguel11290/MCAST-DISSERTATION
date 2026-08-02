@@ -27,12 +27,12 @@ class EvalRow(BaseModel):
     conflicting_lot_ids: list[int] = []
     baseline_status: str
     baseline_reasons: list[str]
+    triggered_rule_ids: list[str] = []
     ml_is_anomaly: bool | None = None
     ml_score: float | None = None
     ml_signals: list[str] | None = None
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 
@@ -99,6 +99,7 @@ def compare_baseline_vs_ml(db: Session = Depends(get_db)):
                 conflicting_lot_ids=base.conflicting_lot_ids,
                 baseline_status=base.status,
                 baseline_reasons=base.reasons,
+                triggered_rule_ids=base.triggered_rule_ids,
                 ml_is_anomaly=ml_is_anomaly,
                 ml_score=ml_score,
                 ml_signals=ml_signals,

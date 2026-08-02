@@ -27,7 +27,7 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
   }
 
   void _load() {
-    if(!mounted) return;
+    if (!mounted) return;
 
     setState(() {
       loading = true;
@@ -88,7 +88,7 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
   }
 
   void _trainAndReload() {
-    if(!mounted) return;
+    if (!mounted) return;
 
     setState(() {
       loading = true;
@@ -101,8 +101,8 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
           _load();
         })
         .catchError((e) {
-          if(!mounted) return;
-          
+          if (!mounted) return;
+
           setState(() {
             error = e.toString();
             loading = false;
@@ -195,8 +195,9 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
                       DataColumn(label: Text("Location")),
                       DataColumn(label: Text("Score")),
                       DataColumn(label: Text("Baseline")),
+                      DataColumn(label: Text("Triggered Rules")),
                       DataColumn(label: Text("Conflicts")),
-                      DataColumn(label: Text("Signals")),
+                      DataColumn(label: Text("ML Explanation")),
                     ],
                     rows:
                         filtered.map((r) {
@@ -215,6 +216,16 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
                                 Text(r.mlScore?.toStringAsFixed(4) ?? ""),
                               ),
                               DataCell(_statusChip(r.baselineStatus)),
+                              DataCell(
+                                SizedBox(
+                                  width: 230,
+                                  child: Text(
+                                    r.triggeredRuleIds.isEmpty
+                                        ? "No deterministic rule"
+                                        : r.triggeredRuleIds.join(", "),
+                                  ),
+                                ),
+                              ),
                               DataCell(
                                 hasConflict
                                     ? Text(

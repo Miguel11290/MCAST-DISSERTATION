@@ -4,6 +4,8 @@ import 'screens/dashboard_screen.dart';
 import 'screens/anomalies_screen.dart';
 import 'screens/metrics_screen.dart';
 import 'screens/experiment_results_screen.dart';
+import 'screens/safety_rules_screen.dart';
+import 'screens/about_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -43,6 +45,8 @@ class _HomeShellState extends State<HomeShell> {
     AnomaliesScreen(),
     MetricsScreen(),
     ExperimentResultsScreen(),
+    SafetyRulesScreen(),
+    AboutScreen(),
   ];
 
   final List<String> _titles = const [
@@ -51,6 +55,8 @@ class _HomeShellState extends State<HomeShell> {
     "Anomalies",
     "Metrics",
     "Experiments",
+    "Safety Rules",
+    "About",
   ];
 
   @override
@@ -93,6 +99,16 @@ class _HomeShellState extends State<HomeShell> {
                 icon: Icon(Icons.science_outlined),
                 selectedIcon: Icon(Icons.science),
                 label: Text("Experiments"),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.rule_outlined),
+                selectedIcon: Icon(Icons.rule),
+                label: Text("Safety Rules"),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.info_outline),
+                selectedIcon: Icon(Icons.info),
+                label: Text("About"),
               ),
             ],
           ),

@@ -21,7 +21,6 @@ class ItemUpdate(BaseModel):
 class ItemRead(ItemCreate):
     id: int
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class InventoryLotCreate(BaseModel):
@@ -38,7 +37,6 @@ class InventoryLotRead(BaseModel):
     scenario_type: str | None = None
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class SafetyCheckResult(BaseModel):
@@ -52,10 +50,10 @@ class SafetyCheckResult(BaseModel):
     storage_days: int
     location: str | None = None
     conflicting_lot_ids: list[int] = []
+    triggered_rule_ids: list[str] = []
     scenario_type: str | None = None
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
 class MLAnomalyResult(BaseModel):
@@ -66,5 +64,4 @@ class MLAnomalyResult(BaseModel):
     top_signals: list[str] # e.g. ["quantity_ratio", "storage_days"]
 
     class Config:
-        orm_mode = True
         from_attributes = True

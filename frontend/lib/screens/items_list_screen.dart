@@ -20,7 +20,7 @@ class _ItemsListScreenState extends State<ItemsListScreen> {
     super.initState();
     api.fetchItems(
       onSuccess: (data) {
-        if(!mounted) return;
+        if (!mounted) return;
 
         setState(() {
           items = data;
@@ -28,8 +28,8 @@ class _ItemsListScreenState extends State<ItemsListScreen> {
         });
       },
       onError: (msg) {
-        if(!mounted) return;
-        
+        if (!mounted) return;
+
         setState(() {
           error = msg;
           loading = false;

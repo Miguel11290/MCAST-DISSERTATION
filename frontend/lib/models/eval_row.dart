@@ -6,6 +6,7 @@ class EvalRow {
   final List<int>? conflictingLotIds;
   final String baselineStatus;
   final List<String> baselineReasons;
+  final List<String> triggeredRuleIds;
   final bool? mlIsAnomaly;
   final double? mlScore;
   final List<String>? mlSignals;
@@ -16,6 +17,7 @@ class EvalRow {
     required this.itemName,
     required this.baselineStatus,
     required this.baselineReasons,
+    required this.triggeredRuleIds,
     this.mlIsAnomaly,
     this.mlScore,
     this.mlSignals,
@@ -36,6 +38,10 @@ class EvalRow {
       baselineStatus: (json["baseline_status"] ?? "").toString(),
       baselineReasons:
           (json["baseline_reasons"] as List<dynamic>? ?? [])
+              .map((e) => e.toString())
+              .toList(),
+      triggeredRuleIds:
+          (json["triggered_rule_ids"] as List<dynamic>? ?? [])
               .map((e) => e.toString())
               .toList(),
       mlIsAnomaly: json["ml_is_anomaly"] as bool?,

@@ -12,16 +12,19 @@ class ItemsApi {
   }) {
     final url = Uri.parse("${ApiConfig.baseUrl}/items");
 
-    client.get(url).then((resp){
-      if(resp.statusCode == 200){
-        final List<dynamic> decoded = json.decode(resp.body);
-        final items = decoded.map((e) => Item.fromJson(e)).toList();
-        onSuccess(items);
-      }else{
-        onError("Failed: ${resp.statusCode} ${resp.body}");
-      }
-    }).catchError((e){
-      onError(e.toString());
-    });
+    client
+        .get(url)
+        .then((resp) {
+          if (resp.statusCode == 200) {
+            final List<dynamic> decoded = json.decode(resp.body);
+            final items = decoded.map((e) => Item.fromJson(e)).toList();
+            onSuccess(items);
+          } else {
+            onError("Failed: ${resp.statusCode} ${resp.body}");
+          }
+        })
+        .catchError((e) {
+          onError(e.toString());
+        });
   }
 }

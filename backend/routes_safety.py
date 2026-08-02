@@ -24,6 +24,7 @@ def evaluate_lot(
 ) -> schemas.SafetyCheckResult:
     reasons: list[str] = []
     conflicting_lot_ids: list[int] = []
+    triggered_rule_ids: list[str] = []
     status = "SAFE"
 
     # Storage duration rule
@@ -32,23 +33,26 @@ def evaluate_lot(
 
     if storage_days > storage_limit:
         status = "WARNING"
+        triggered_rule_ids.append("storage_duration")
         reasons.append(
-            f"Storage duration exceeded limit ({storage_days} > {storage_limit} days)"
+            f"Storage duration exceeded configured review period ({storage_days} > {storage_limit} days)"
         )
 
     # Quantity threshold rule
     if item.max_safe_quantity is not None:
         if lot.quantity > item.max_safe_quantity:
             status = "UNSAFE"
+            triggered_rule_ids.append("quantity_limit")
             reasons.append(
-                f"Lot quantity exceeds max safe quantity ({lot.quantity} > {item.max_safe_quantity})"
+                f"Lot quantity exceeds configured maximum ({lot.quantity} > {item.max_safe_quantity})"
             )
 
     # Missing classification warning
     if not item.hazard_class:
         if status == "SAFE":
             status = "WARNING"
-        reasons.append("Item hazard class is not specified")
+        triggered_rule_ids.append("missing_hazard_class")
+        reasons.append("Item hazard classification is not specified")
 
     # Compatibility rule: same location, incompatible storage groups
     if location_context:
@@ -58,8 +62,10 @@ def evaluate_lot(
 
             if are_incompatible(item.storage_group, other_item.storage_group):
                 status = "UNSAFE"
+                if "incompatible_storage" not in triggered_rule_ids:
+                    triggered_rule_ids.append("incompatible_storage")
                 reasons.append(
-                    f"Incompatible storage group with lot {other_lot.id} in same location"
+                    f"Configured incompatible storage group with lot {other_lot.id} in the same location"
                 )
                 conflicting_lot_ids.append(other_lot.id)
 
@@ -73,7 +79,8 @@ def evaluate_lot(
         received_at=lot.received_at,
         storage_days=storage_days,
         location=lot.location,
-        conflicting_lot_ids=conflicting_lot_ids
+        conflicting_lot_ids=sorted(set(conflicting_lot_ids)),
+        triggered_rule_ids=triggered_rule_ids
     )
 
 

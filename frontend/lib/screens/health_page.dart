@@ -30,7 +30,7 @@ class _HealthPageState extends State<HealthPage> {
         })
         .catchError((error) {
           if (!mounted) return;
-          
+
           setState(() {
             statusText = "API Error: $error";
           });

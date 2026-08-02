@@ -4,11 +4,11 @@ import '../core/api_config.dart';
 import '../models/health_response.dart';
 
 class ApiService {
-  Future<HealthResponse> getHealth(){
+  Future<HealthResponse> getHealth() {
     final url = Uri.parse("${ApiConfig.baseUrl}/health");
 
     return http.get(url).then((response) {
-      if(response.statusCode != 200){
+      if (response.statusCode != 200) {
         throw Exception("API error: ${response.statusCode}");
       }
 
