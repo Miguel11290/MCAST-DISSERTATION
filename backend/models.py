@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Float, DateTime
+from sqlalchemy import Column, ForeignKey, Integer, String, Float, DateTime, Boolean
 from database import Base
 from datetime import datetime
 
@@ -23,3 +23,14 @@ class InventoryLot(Base):
     location = Column(String, nullable=True)
     received_at = Column(DateTime, default=datetime.utcnow)
     scenario_type = Column(String, nullable=True)
+    
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="viewer") 
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

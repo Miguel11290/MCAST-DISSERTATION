@@ -65,3 +65,28 @@ class MLAnomalyResult(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class UserCreate(BaseModel):
+    username: str
+    full_name: Optional[str] = None
+    password: str
+    role: str = "viewer"  # default role
+    
+class UserRead(BaseModel):
+    id: int
+    username: str
+    full_name: Optional[str] = None
+    role: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    
+class LoginRequest(BaseModel):
+    username: str
+    password: str
