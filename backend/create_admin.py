@@ -1,6 +1,9 @@
-from database import SessionLocal
 from auth import hash_password
+from database import Base, SessionLocal, engine
 from models import User
+
+# Creates the users table without deleting existing data.
+Base.metadata.create_all(bind=engine)
 
 db = SessionLocal()
 

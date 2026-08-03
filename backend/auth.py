@@ -8,10 +8,17 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from database import get_db
+from database import SessionLocal
 from models import User
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key")
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "51ef7d3e18392fe57d055c738d068d2786f8e2633d1191a9f631314e46a15bbd")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 

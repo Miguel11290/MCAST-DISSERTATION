@@ -10,6 +10,7 @@ from routes_metrics import router as metrics_router
 from routes_experiments import router as experiments_router
 from routes_summary import router as summary_router
 from routes_rules import router as rules_router
+from routes_auth import router as auth_router
 import models
 
 app = FastAPI(title="Inventory & Safety Management System API")
@@ -40,3 +41,4 @@ app.include_router(metrics_router)
 app.include_router(experiments_router)
 app.include_router(summary_router)
 app.include_router(rules_router)
+app.include_router(auth_router)
