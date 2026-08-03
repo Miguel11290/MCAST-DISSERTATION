@@ -7,8 +7,8 @@ class AuthenticatedClient extends http.BaseClient {
     required AuthService authService,
     http.Client? innerClient,
     this.onUnauthorized,
-  })  : _authService = authService,
-        _innerClient = innerClient ?? http.Client();
+  }) : _authService = authService,
+       _innerClient = innerClient ?? http.Client();
 
   final AuthService _authService;
   final http.Client _innerClient;
@@ -22,10 +22,7 @@ class AuthenticatedClient extends http.BaseClient {
       request.headers['Authorization'] = 'Bearer $token';
     }
 
-    request.headers.putIfAbsent(
-      'Accept',
-      () => 'application/json',
-    );
+    request.headers.putIfAbsent('Accept', () => 'application/json');
 
     final response = await _innerClient.send(request);
 

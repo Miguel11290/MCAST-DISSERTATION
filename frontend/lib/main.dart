@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import 'models/auth_user.dart';
 import 'screens/about_screen.dart';
 import 'screens/anomalies_screen.dart';
+import 'screens/audit_logs_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/experiment_results_screen.dart';
 import 'screens/items_list_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/metrics_screen.dart';
 import 'screens/safety_rules_screen.dart';
+import 'screens/users_screen.dart';
 import 'services/auth_service.dart';
 import 'services/authenticated_client.dart';
-import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -86,15 +88,27 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _handleLoginSucceeded() async {
-    final user = await _authService.getCurrentUser();
+    try {
+      final user = await _authService.getCurrentUser();
 
-    if (!mounted) {
-      return;
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentUser = user;
+      });
+    } on AuthException {
+      await _authService.clearSession();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentUser = null;
+      });
     }
-
-    setState(() {
-      _currentUser = user;
-    });
   }
 
   Future<void> _logout() async {
@@ -161,8 +175,8 @@ class HomeShell extends StatefulWidget {
   });
 
   final AuthUser currentUser;
-  final Future<void> Function() onLogout;
   final http.Client apiClient;
+  final Future<void> Function() onLogout;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -172,40 +186,106 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   bool _isLoggingOut = false;
 
-  final List<Widget> _pages = const [
-    ItemsListScreen(),
-    DashboardScreen(),
-    AnomaliesScreen(),
-    MetricsScreen(),
-    ExperimentResultsScreen(),
-    SafetyRulesScreen(),
-    AboutScreen(),
+  bool get _canViewAuditLogs {
+    return widget.currentUser.isAdmin ||
+        widget.currentUser.role == 'safety_officer';
+  }
+
+  List<Widget> get _pages => [
+    ItemsListScreen(client: widget.apiClient, currentUser: widget.currentUser),
+    DashboardScreen(client: widget.apiClient),
+    AnomaliesScreen(client: widget.apiClient, currentUser: widget.currentUser),
+    MetricsScreen(client: widget.apiClient, currentUser: widget.currentUser),
+    ExperimentResultsScreen(
+      client: widget.apiClient,
+      currentUser: widget.currentUser,
+    ),
+    SafetyRulesScreen(client: widget.apiClient),
+    if (_canViewAuditLogs) AuditLogsScreen(client: widget.apiClient),
+    if (widget.currentUser.isAdmin) UsersScreen(client: widget.apiClient),
+    const AboutScreen(),
   ];
 
-  final List<String> _titles = const [
+  List<String> get _titles => [
     'Items',
     'Dashboard',
     'Anomalies',
     'Metrics',
     'Experiments',
     'Safety Rules',
+    if (_canViewAuditLogs) 'Audit Logs',
+    if (widget.currentUser.isAdmin) 'Users',
     'About',
+  ];
+
+  List<NavigationRailDestination> get _destinations => [
+    const NavigationRailDestination(
+      icon: Icon(Icons.inventory_2_outlined),
+      selectedIcon: Icon(Icons.inventory_2),
+      label: Text('Items'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.dashboard_outlined),
+      selectedIcon: Icon(Icons.dashboard),
+      label: Text('Dashboard'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.warning_amber_outlined),
+      selectedIcon: Icon(Icons.warning_amber),
+      label: Text('Anomalies'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.bar_chart_outlined),
+      selectedIcon: Icon(Icons.bar_chart),
+      label: Text('Metrics'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.science_outlined),
+      selectedIcon: Icon(Icons.science),
+      label: Text('Experiments'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.rule_outlined),
+      selectedIcon: Icon(Icons.rule),
+      label: Text('Safety Rules'),
+    ),
+    if (_canViewAuditLogs)
+      const NavigationRailDestination(
+        icon: Icon(Icons.history_outlined),
+        selectedIcon: Icon(Icons.history),
+        label: Text('Audit Logs'),
+      ),
+    if (widget.currentUser.isAdmin)
+      const NavigationRailDestination(
+        icon: Icon(Icons.people_outline),
+        selectedIcon: Icon(Icons.people),
+        label: Text('Users'),
+      ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.info_outline),
+      selectedIcon: Icon(Icons.info),
+      label: Text('About'),
+    ),
   ];
 
   Future<void> _confirmLogout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Sign out'),
           content: const Text('Are you sure you want to sign out?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
               child: const Text('Sign out'),
             ),
           ],
@@ -235,27 +315,60 @@ class _HomeShellState extends State<HomeShell> {
   String _formatRole(String role) {
     return role
         .split('_')
+        .where((part) => part.isNotEmpty)
         .map(
           (part) =>
-              part.isEmpty
-                  ? part
-                  : '${part[0].toUpperCase()}${part.substring(1)}',
+              '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
         )
         .join(' ');
   }
 
+  String _initialForUser() {
+    final displayName = widget.currentUser.displayName.trim();
+
+    if (displayName.isEmpty) {
+      return '?';
+    }
+
+    return displayName[0].toUpperCase();
+  }
+
+  Color _roleColor() {
+    if (widget.currentUser.isAdmin) {
+      return Colors.red;
+    }
+
+    if (widget.currentUser.canManageInventory) {
+      return Colors.blue;
+    }
+
+    if (widget.currentUser.canRunExperiments) {
+      return Colors.purple;
+    }
+
+    return Colors.grey;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final pages = _pages;
+    final titles = _titles;
+    final destinations = _destinations;
+
+    final safeIndex = _index >= 0 && _index < pages.length ? _index : 0;
+
     final roleLabel = _formatRole(widget.currentUser.role);
+
+    final roleColor = _roleColor();
 
     return Scaffold(
       body: Row(
         children: [
           NavigationRail(
-            selectedIndex: _index,
-            onDestinationSelected: (i) {
+            selectedIndex: safeIndex,
+            onDestinationSelected: (selectedIndex) {
               setState(() {
-                _index = i;
+                _index = selectedIndex;
               });
             },
             labelType: NavigationRailLabelType.all,
@@ -266,11 +379,9 @@ class _HomeShellState extends State<HomeShell> {
               child: Tooltip(
                 message: '${widget.currentUser.displayName}\n$roleLabel',
                 child: CircleAvatar(
-                  child: Text(
-                    widget.currentUser.displayName.isNotEmpty
-                        ? widget.currentUser.displayName[0].toUpperCase()
-                        : '?',
-                  ),
+                  backgroundColor: roleColor.withValues(alpha: 0.15),
+                  foregroundColor: roleColor,
+                  child: Text(_initialForUser()),
                 ),
               ),
             ),
@@ -294,43 +405,7 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               ),
             ),
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.inventory_2_outlined),
-                selectedIcon: Icon(Icons.inventory_2),
-                label: Text('Items'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: Text('Dashboard'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.warning_amber_outlined),
-                selectedIcon: Icon(Icons.warning_amber),
-                label: Text('Anomalies'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.bar_chart_outlined),
-                selectedIcon: Icon(Icons.bar_chart),
-                label: Text('Metrics'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.science_outlined),
-                selectedIcon: Icon(Icons.science),
-                label: Text('Experiments'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.rule_outlined),
-                selectedIcon: Icon(Icons.rule),
-                label: Text('Safety Rules'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.info_outline),
-                selectedIcon: Icon(Icons.info),
-                label: Text('About'),
-              ),
-            ],
+            destinations: destinations,
           ),
           const VerticalDivider(width: 1),
           Expanded(
@@ -344,7 +419,7 @@ class _HomeShellState extends State<HomeShell> {
                     children: [
                       Expanded(
                         child: Text(
-                          _titles[_index],
+                          titles[safeIndex],
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -359,9 +434,27 @@ class _HomeShellState extends State<HomeShell> {
                             widget.currentUser.displayName,
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          Text(
-                            roleLabel,
-                            style: Theme.of(context).textTheme.bodySmall,
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: roleColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: roleColor.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: Text(
+                              roleLabel,
+                              style: TextStyle(
+                                color: roleColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -373,40 +466,47 @@ class _HomeShellState extends State<HomeShell> {
                             _confirmLogout();
                           }
                         },
-                        itemBuilder:
-                            (context) => [
-                              PopupMenuItem<String>(
-                                enabled: false,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      widget.currentUser.username,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                        itemBuilder: (context) {
+                          return [
+                            PopupMenuItem<String>(
+                              enabled: false,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.currentUser.username,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    Text(roleLabel),
-                                  ],
-                                ),
+                                  ),
+                                  Text(roleLabel),
+                                ],
                               ),
-                              const PopupMenuDivider(),
-                              const PopupMenuItem<String>(
-                                value: 'logout',
-                                child: ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: Icon(Icons.logout),
-                                  title: Text('Sign out'),
-                                ),
+                            ),
+                            const PopupMenuDivider(),
+                            const PopupMenuItem<String>(
+                              value: 'logout',
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: Icon(Icons.logout),
+                                title: Text('Sign out'),
                               ),
-                            ],
-                        child: const CircleAvatar(child: Icon(Icons.person)),
+                            ),
+                          ];
+                        },
+                        child: CircleAvatar(
+                          backgroundColor: roleColor.withValues(alpha: 0.15),
+                          foregroundColor: roleColor,
+                          child: Text(_initialForUser()),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const Divider(height: 1),
-                Expanded(child: IndexedStack(index: _index, children: _pages)),
+                Expanded(
+                  child: IndexedStack(index: safeIndex, children: pages),
+                ),
               ],
             ),
           ),

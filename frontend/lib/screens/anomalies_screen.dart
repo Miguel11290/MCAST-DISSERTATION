@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
-import '../services/evaluation_api.dart';
+import 'package:http/http.dart' as http;
+
+import '../models/auth_user.dart';
 import '../models/eval_row.dart';
+import '../services/evaluation_api.dart';
 
 class AnomaliesScreen extends StatefulWidget {
-  const AnomaliesScreen({super.key});
+  const AnomaliesScreen({
+    required this.client,
+    required this.currentUser,
+    super.key,
+  });
+
+  final http.Client client;
+  final AuthUser currentUser;
 
   @override
   State<AnomaliesScreen> createState() => _AnomaliesScreenState();
 }
 
 class _AnomaliesScreenState extends State<AnomaliesScreen> {
-  final api = EvaluationApi();
+  late final EvaluationApi api;
 
   String? error;
   bool loading = true;
@@ -18,114 +28,143 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
   List<EvalRow> all = [];
   List<EvalRow> filtered = [];
 
-  String query = "";
+  String query = '';
 
   @override
   void initState() {
     super.initState();
+
+    api = EvaluationApi(client: widget.client);
+
     _load();
   }
 
-  void _load() {
-    if (!mounted) return;
+  Future<void> _load() async {
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       loading = true;
       error = null;
     });
 
-    api
-        .getEvalLots()
-        .then((data) {
-          final only = data.where((r) => r.mlIsAnomaly == true).toList();
+    try {
+      final data = await api.getEvalLots();
 
-          if (!mounted) return;
+      final anomalies = data.where((row) => row.mlIsAnomaly == true).toList();
 
-          setState(() {
-            all = only;
-            filtered = _applyFilter(only, query);
-            loading = false;
-          });
-        })
-        .catchError((e) {
-          if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-          setState(() {
-            error = e.toString();
-            loading = false;
-          });
-        });
+      setState(() {
+        all = anomalies;
+        filtered = _applyFilter(anomalies, query);
+        loading = false;
+      });
+    } catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        error = exception.toString();
+        loading = false;
+      });
+    }
   }
 
-  List<EvalRow> _applyFilter(List<EvalRow> rows, String q) {
-    final qq = q.trim().toLowerCase();
-    if (qq.isEmpty) return rows;
+  List<EvalRow> _applyFilter(List<EvalRow> rows, String searchTerm) {
+    final queryValue = searchTerm.trim().toLowerCase();
 
-    return rows.where((r) {
-      final signals = (r.mlSignals ?? []).join(" ").toLowerCase();
-      final conflictsText = (r.conflictingLotIds ?? []).join(" ").toLowerCase();
+    if (queryValue.isEmpty) {
+      return rows;
+    }
 
-      return signals.contains(qq) ||
-          r.baselineStatus.toLowerCase().contains(qq) ||
-          r.lotId.toString().contains(qq) ||
-          r.itemId.toString().contains(qq) ||
-          r.itemName.toLowerCase().contains(qq) ||
-          (r.location ?? "").toLowerCase().contains(qq) ||
-          conflictsText.contains(qq) ||
-          (qq.contains("conflict") &&
-              r.conflictingLotIds != null &&
-              r.conflictingLotIds!.isNotEmpty);
+    return rows.where((row) {
+      final signals = (row.mlSignals ?? []).join(' ').toLowerCase();
+
+      final conflictsText =
+          (row.conflictingLotIds ?? []).join(' ').toLowerCase();
+
+      final triggeredRules = row.triggeredRuleIds.join(' ').toLowerCase();
+
+      return signals.contains(queryValue) ||
+          triggeredRules.contains(queryValue) ||
+          row.baselineStatus.toLowerCase().contains(queryValue) ||
+          row.lotId.toString().contains(queryValue) ||
+          row.itemId.toString().contains(queryValue) ||
+          row.itemName.toLowerCase().contains(queryValue) ||
+          (row.location ?? '').toLowerCase().contains(queryValue) ||
+          conflictsText.contains(queryValue) ||
+          (queryValue.contains('conflict') &&
+              row.conflictingLotIds != null &&
+              row.conflictingLotIds!.isNotEmpty);
     }).toList();
   }
 
-  void _onSearch(String v) {
-    if (!mounted) return;
+  void _onSearch(String value) {
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
-      query = v;
-      filtered = _applyFilter(all, v);
+      query = value;
+      filtered = _applyFilter(all, value);
     });
   }
 
-  void _trainAndReload() {
-    if (!mounted) return;
+  Future<void> _trainAndReload() async {
+    if (!widget.currentUser.canRunExperiments) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       loading = true;
       error = null;
     });
 
-    api
-        .trainMl(contamination: 0.10)
-        .then((_) {
-          _load();
-        })
-        .catchError((e) {
-          if (!mounted) return;
+    try {
+      await api.trainMl(contamination: 0.10);
 
-          setState(() {
-            error = e.toString();
-            loading = false;
-          });
-        });
+      await _load();
+    } catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        error = exception.toString();
+        loading = false;
+      });
+    }
   }
 
-  Color _rowColor(EvalRow r) {
+  Color _rowColor(EvalRow row) {
     final hasConflict =
-        r.conflictingLotIds != null && r.conflictingLotIds!.isNotEmpty;
+        row.conflictingLotIds != null && row.conflictingLotIds!.isNotEmpty;
 
-    if (hasConflict || r.baselineStatus == "UNSAFE") {
+    if (hasConflict || row.baselineStatus == 'UNSAFE') {
       return Colors.red.withValues(alpha: 0.08);
     }
-    if (r.baselineStatus == "WARNING") {
+
+    if (row.baselineStatus == 'WARNING') {
       return Colors.orange.withValues(alpha: 0.08);
     }
+
     return Colors.transparent;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -138,7 +177,8 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
                   onChanged: _onSearch,
                   decoration: const InputDecoration(
                     labelText:
-                        "Search anomalies (item, location, conflict, signal...)",
+                        'Search anomalies '
+                        '(item, location, conflict, rule, signal...)',
                     prefixIcon: Icon(Icons.search),
                     border: OutlineInputBorder(),
                   ),
@@ -148,19 +188,20 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
               ElevatedButton.icon(
                 onPressed: _load,
                 icon: const Icon(Icons.refresh),
-                label: const Text("Refresh"),
+                label: const Text('Refresh'),
               ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: _trainAndReload,
-                icon: const Icon(Icons.model_training),
-                label: const Text("Train ML"),
-              ),
+              if (widget.currentUser.canRunExperiments) ...[
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _trainAndReload,
+                  icon: const Icon(Icons.model_training),
+                  label: const Text('Retrain ML'),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 12),
-
-          if (error != null)
+          if (error != null) ...[
+            const SizedBox(height: 12),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -171,14 +212,15 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
               ),
               child: Text(error!),
             ),
-
+          ],
           const SizedBox(height: 12),
-
           if (filtered.isEmpty)
-            const Expanded(
+            Expanded(
               child: Center(
                 child: Text(
-                  "No anomalies found. Click 'Train ML' then Refresh.",
+                  widget.currentUser.canRunExperiments
+                      ? 'No anomalies were found. You can retrain the model and refresh.'
+                      : 'No anomalies were found.',
                 ),
               ),
             )
@@ -189,55 +231,56 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                     columns: const [
-                      DataColumn(label: Text("Lot")),
-                      DataColumn(label: Text("Item ID")),
-                      DataColumn(label: Text("Item Name")),
-                      DataColumn(label: Text("Location")),
-                      DataColumn(label: Text("Score")),
-                      DataColumn(label: Text("Baseline")),
-                      DataColumn(label: Text("Triggered Rules")),
-                      DataColumn(label: Text("Conflicts")),
-                      DataColumn(label: Text("ML Explanation")),
+                      DataColumn(label: Text('Lot')),
+                      DataColumn(label: Text('Item ID')),
+                      DataColumn(label: Text('Item Name')),
+                      DataColumn(label: Text('Location')),
+                      DataColumn(label: Text('Score')),
+                      DataColumn(label: Text('Baseline')),
+                      DataColumn(label: Text('Triggered Rules')),
+                      DataColumn(label: Text('Conflicts')),
+                      DataColumn(label: Text('ML Explanation')),
                     ],
                     rows:
-                        filtered.map((r) {
+                        filtered.map((row) {
                           final hasConflict =
-                              r.conflictingLotIds != null &&
-                              r.conflictingLotIds!.isNotEmpty;
+                              row.conflictingLotIds != null &&
+                              row.conflictingLotIds!.isNotEmpty;
 
                           return DataRow(
-                            color: WidgetStateProperty.all(_rowColor(r)),
+                            color: WidgetStateProperty.all(_rowColor(row)),
                             cells: [
-                              DataCell(Text("${r.lotId}")),
-                              DataCell(Text("${r.itemId}")),
-                              DataCell(Text(r.itemName)),
-                              DataCell(Text(r.location ?? "-")),
+                              DataCell(Text('${row.lotId}')),
+                              DataCell(Text('${row.itemId}')),
+                              DataCell(Text(row.itemName)),
+                              DataCell(Text(row.location ?? '-')),
                               DataCell(
-                                Text(r.mlScore?.toStringAsFixed(4) ?? ""),
+                                Text(row.mlScore?.toStringAsFixed(4) ?? ''),
                               ),
-                              DataCell(_statusChip(r.baselineStatus)),
+                              DataCell(_statusChip(row.baselineStatus)),
                               DataCell(
                                 SizedBox(
                                   width: 230,
                                   child: Text(
-                                    r.triggeredRuleIds.isEmpty
-                                        ? "No deterministic rule"
-                                        : r.triggeredRuleIds.join(", "),
+                                    row.triggeredRuleIds.isEmpty
+                                        ? 'No deterministic rule'
+                                        : row.triggeredRuleIds.join(', '),
                                   ),
                                 ),
                               ),
                               DataCell(
                                 hasConflict
                                     ? Text(
-                                      "⚠ ${r.conflictingLotIds!.join(", ")}",
+                                      '⚠ '
+                                      '${row.conflictingLotIds!.join(', ')}',
                                     )
-                                    : const Text("-"),
+                                    : const Text('-'),
                               ),
                               DataCell(
                                 SizedBox(
                                   width: 540,
                                   child: Text(
-                                    (r.mlSignals ?? []).join(" | "),
+                                    (row.mlSignals ?? []).join(' | '),
                                     softWrap: true,
                                   ),
                                 ),
@@ -255,20 +298,20 @@ class _AnomaliesScreenState extends State<AnomaliesScreen> {
   }
 
   Widget _statusChip(String status) {
-    Color bg;
+    Color background;
 
-    if (status == "UNSAFE") {
-      bg = Colors.red.shade100;
-    } else if (status == "WARNING") {
-      bg = Colors.orange.shade100;
+    if (status == 'UNSAFE') {
+      background = Colors.red.shade100;
+    } else if (status == 'WARNING') {
+      background = Colors.orange.shade100;
     } else {
-      bg = Colors.green.shade100;
+      background = Colors.green.shade100;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: bg,
+        color: background,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(),
       ),

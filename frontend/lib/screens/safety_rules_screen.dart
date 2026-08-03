@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import '../models/safety_rule.dart';
 import '../services/rules_api.dart';
 
 class SafetyRulesScreen extends StatefulWidget {
-  const SafetyRulesScreen({super.key});
+  const SafetyRulesScreen({required this.client, super.key});
+
+  final http.Client client;
 
   @override
   State<SafetyRulesScreen> createState() => _SafetyRulesScreenState();
 }
 
 class _SafetyRulesScreenState extends State<SafetyRulesScreen> {
-  final RulesApi api = RulesApi();
+  late final RulesApi api;
+
   bool loading = true;
   String? error;
   RulesResponse? response;
@@ -18,11 +23,17 @@ class _SafetyRulesScreenState extends State<SafetyRulesScreen> {
   @override
   void initState() {
     super.initState();
+
+    api = RulesApi(client: widget.client);
+
     _load();
   }
 
   Future<void> _load() async {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       loading = true;
       error = null;
@@ -30,15 +41,22 @@ class _SafetyRulesScreenState extends State<SafetyRulesScreen> {
 
     try {
       final result = await api.getRules();
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         response = result;
         loading = false;
       });
-    } catch (e) {
-      if (!mounted) return;
+    } catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        error = e.toString();
+        error = exception.toString();
         loading = false;
       });
     }
@@ -46,15 +64,19 @@ class _SafetyRulesScreenState extends State<SafetyRulesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          if (error != null)
+          if (error != null) ...[
             _messageCard(error!, Icons.error_outline, Colors.red.shade50),
+            const SizedBox(height: 16),
+          ],
           if (response != null) ...[
             _messageCard(
               response!.disclaimer,
@@ -68,14 +90,17 @@ class _SafetyRulesScreenState extends State<SafetyRulesScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Each rule exposes its purpose, authority and configuration status. '
-              'The prototype supports decisions; it does not make legal determinations.',
+              'Each rule exposes its purpose, authority, and configuration '
+              'status. The prototype supports decisions; it does not make '
+              'legal determinations.',
             ),
             const SizedBox(height: 16),
             ...response!.rules.map(_ruleCard),
             const SizedBox(height: 20),
             _configurationCard(response!.configuration),
           ],
+          if (response == null && error == null)
+            const Center(child: Text('No safety rules are available.')),
         ],
       ),
     );
@@ -180,7 +205,9 @@ class _SafetyRulesScreenState extends State<SafetyRulesScreen> {
             ),
             const SizedBox(height: 12),
             SelectableText(
-              config.entries.map((e) => '${e.key}: ${e.value}').join('\n'),
+              config.entries
+                  .map((entry) => '${entry.key}: ${entry.value}')
+                  .join('\n'),
               style: const TextStyle(fontFamily: 'monospace', height: 1.5),
             ),
           ],

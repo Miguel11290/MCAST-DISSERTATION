@@ -115,3 +115,17 @@ def create_user(
     db.refresh(user)
 
     return user
+
+@router.get(
+    "/users",
+    response_model=list[UserRead],
+)
+def list_users(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin")),
+):
+    return (
+        db.query(User)
+        .order_by(User.username.asc())
+        .all()
+    )

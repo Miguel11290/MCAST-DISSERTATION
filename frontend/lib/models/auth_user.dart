@@ -32,4 +32,14 @@ class AuthUser {
 
     return username;
   }
+
+  // Role helpers
+
+  bool get isAdmin => role == 'admin';
+
+  bool get canManageInventory => role == 'admin' || role == 'inventory_officer';
+
+  bool get canRunExperiments => role == 'admin' || role == 'safety_officer';
+
+  bool get isReadOnly => !canManageInventory && !canRunExperiments;
 }

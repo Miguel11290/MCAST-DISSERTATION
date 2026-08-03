@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
-import '../services/evaluation_api.dart';
+import 'package:http/http.dart' as http;
+
+import '../models/auth_user.dart';
 import '../models/ml_metrics.dart';
+import '../services/evaluation_api.dart';
 
 class ExperimentResultsScreen extends StatefulWidget {
-  const ExperimentResultsScreen({super.key});
+  const ExperimentResultsScreen({
+    required this.client,
+    required this.currentUser,
+    super.key,
+  });
+
+  final http.Client client;
+  final AuthUser currentUser;
 
   @override
   State<ExperimentResultsScreen> createState() =>
@@ -11,7 +21,7 @@ class ExperimentResultsScreen extends StatefulWidget {
 }
 
 class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
-  final api = EvaluationApi();
+  late final EvaluationApi api;
 
   bool loading = true;
   String? error;
@@ -23,94 +33,96 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
   @override
   void initState() {
     super.initState();
+
+    api = EvaluationApi(client: widget.client);
+
     _load();
   }
 
-  void _load() {
-    if (!mounted) return;
+  Future<void> _load() async {
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       loading = true;
       error = null;
     });
 
-    api
-        .getMlVsBaselineMetrics()
-        .then((m) {
-          api
-              .getRocSweep()
-              .then((roc) {
-                api
-                    .getConfusionMatrix()
-                    .then((cm) {
-                      if (!mounted) return;
+    MlMetrics? loadedMetrics;
+    List<dynamic> loadedRocPoints = [];
+    Map<String, dynamic>? loadedConfusionMatrix;
+    String? partialError;
 
-                      setState(() {
-                        metrics = m;
-                        rocPoints = roc;
-                        confusionMatrix = cm;
-                        loading = false;
-                      });
-                    })
-                    .catchError((e) {
-                      if (!mounted) return;
+    try {
+      loadedMetrics = await api.getMlVsBaselineMetrics();
 
-                      setState(() {
-                        metrics = m;
-                        rocPoints = roc;
-                        confusionMatrix = null;
-                        error = e.toString();
-                        loading = false;
-                      });
-                    });
-              })
-              .catchError((e) {
-                if (!mounted) return;
+      try {
+        loadedRocPoints = await api.getRocSweep();
+      } catch (exception) {
+        partialError = exception.toString();
+      }
 
-                setState(() {
-                  metrics = m;
-                  rocPoints = [];
-                  confusionMatrix = null;
-                  error = e.toString();
-                  loading = false;
-                });
-              });
-        })
-        .catchError((e) {
-          if (!mounted) return;
+      try {
+        loadedConfusionMatrix = await api.getConfusionMatrix();
+      } catch (exception) {
+        partialError ??= exception.toString();
+      }
 
-          setState(() {
-            metrics = null;
-            rocPoints = [];
-            confusionMatrix = null;
-            error = e.toString();
-            loading = false;
-          });
-        });
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        metrics = loadedMetrics;
+        rocPoints = loadedRocPoints;
+        confusionMatrix = loadedConfusionMatrix;
+        error = partialError;
+        loading = false;
+      });
+    } catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        metrics = null;
+        rocPoints = [];
+        confusionMatrix = null;
+        error = exception.toString();
+        loading = false;
+      });
+    }
   }
 
-  void _trainMl() {
-    if (!mounted) return;
+  Future<void> _trainMl() async {
+    if (!widget.currentUser.canRunExperiments) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       loading = true;
       error = null;
     });
 
-    api
-        .trainMl(contamination: 0.10)
-        .then((_) {
-          if (!mounted) return;
-          _load();
-        })
-        .catchError((e) {
-          if (!mounted) return;
+    try {
+      await api.trainMl(contamination: 0.10);
 
-          setState(() {
-            error = e.toString();
-            loading = false;
-          });
-        });
+      await _load();
+    } catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        error = exception.toString();
+        loading = false;
+      });
+    }
   }
 
   Widget _metricCard(String title, String value, {Color? color}) {
@@ -147,8 +159,10 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
   }
 
   Widget _buildMetricsSection() {
-    if (metrics == null) {
-      return const Text("No metrics available.");
+    final currentMetrics = metrics;
+
+    if (currentMetrics == null) {
+      return const Text('No metrics are available.');
     }
 
     return Wrap(
@@ -156,41 +170,43 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
       runSpacing: 12,
       children: [
         _metricCard(
-          "Precision",
-          metrics!.precision.toStringAsFixed(3),
+          'Precision',
+          currentMetrics.precision.toStringAsFixed(3),
           color: Colors.blue.shade50,
         ),
         _metricCard(
-          "Recall",
-          metrics!.recall.toStringAsFixed(3),
+          'Recall',
+          currentMetrics.recall.toStringAsFixed(3),
           color: Colors.green.shade50,
         ),
         _metricCard(
-          "F1 Score",
-          metrics!.f1.toStringAsFixed(3),
+          'F1 Score',
+          currentMetrics.f1.toStringAsFixed(3),
           color: Colors.purple.shade50,
         ),
         _metricCard(
-          "Accuracy",
-          metrics!.accuracy.toStringAsFixed(3),
+          'Accuracy',
+          currentMetrics.accuracy.toStringAsFixed(3),
           color: Colors.teal.shade50,
         ),
-        _metricCard("TP / FP", "${metrics!.tp} / ${metrics!.fp}"),
-        _metricCard("TN / FN", "${metrics!.tn} / ${metrics!.fn}"),
+        _metricCard('TP / FP', '${currentMetrics.tp} / ${currentMetrics.fp}'),
+        _metricCard('TN / FN', '${currentMetrics.tn} / ${currentMetrics.fn}'),
       ],
     );
   }
 
   Widget _buildConfusionMatrix() {
-    if (confusionMatrix == null || confusionMatrix!["matrix"] == null) {
-      return const Text("No confusion matrix available.");
+    final currentMatrix = confusionMatrix;
+
+    if (currentMatrix == null || currentMatrix['matrix'] == null) {
+      return const Text('No confusion matrix is available.');
     }
 
-    final matrix = confusionMatrix!["matrix"] as Map<String, dynamic>;
-    final tp = matrix["TP"] ?? 0;
-    final fp = matrix["FP"] ?? 0;
-    final tn = matrix["TN"] ?? 0;
-    final fn = matrix["FN"] ?? 0;
+    final matrix = currentMatrix['matrix'] as Map<String, dynamic>;
+    final tp = matrix['TP'] ?? 0;
+    final fp = matrix['FP'] ?? 0;
+    final tn = matrix['TN'] ?? 0;
+    final fn = matrix['FN'] ?? 0;
 
     Widget cell(String title, dynamic value, Color color) {
       return Container(
@@ -208,7 +224,7 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
-              "$value",
+              '$value',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
             ),
           ],
@@ -220,28 +236,28 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Rows = Actual, Columns = Predicted",
+          'Rows = Actual, Columns = Predicted',
           style: TextStyle(fontSize: 14),
         ),
         const SizedBox(height: 12),
-        Row(
+        const Row(
           children: [
-            const SizedBox(width: 90),
-            const SizedBox(
+            SizedBox(width: 90),
+            SizedBox(
               width: 160,
               child: Center(
                 child: Text(
-                  "Predicted Unsafe",
+                  'Predicted Unsafe',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            const SizedBox(
+            SizedBox(width: 12),
+            SizedBox(
               width: 160,
               child: Center(
                 child: Text(
-                  "Predicted Safe",
+                  'Predicted Safe',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -254,13 +270,13 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
             const SizedBox(
               width: 90,
               child: Text(
-                "Actual Unsafe",
+                'Actual Unsafe',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            cell("TP", tp, Colors.green.shade100),
+            cell('TP', tp, Colors.green.shade100),
             const SizedBox(width: 12),
-            cell("FN", fn, Colors.orange.shade100),
+            cell('FN', fn, Colors.orange.shade100),
           ],
         ),
         const SizedBox(height: 12),
@@ -269,13 +285,13 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
             const SizedBox(
               width: 90,
               child: Text(
-                "Actual Safe",
+                'Actual Safe',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            cell("FP", fp, Colors.red.shade100),
+            cell('FP', fp, Colors.red.shade100),
             const SizedBox(width: 12),
-            cell("TN", tn, Colors.blue.shade100),
+            cell('TN', tn, Colors.blue.shade100),
           ],
         ),
       ],
@@ -284,7 +300,7 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
 
   Widget _buildRocChart() {
     if (rocPoints.isEmpty) {
-      return const Text("No ROC-style data available.");
+      return const Text('No ROC-style data is available.');
     }
 
     return Container(
@@ -298,31 +314,33 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
       ),
       child: CustomPaint(
         painter: RocChartPainter(rocPoints),
-        child: Container(),
+        child: const SizedBox.expand(),
       ),
     );
   }
 
   Widget _buildRocTable() {
     if (rocPoints.isEmpty) {
-      return const Text("No ROC-style data available.");
+      return const Text('No ROC-style data is available.');
     }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columns: const [
-          DataColumn(label: Text("Threshold")),
-          DataColumn(label: Text("TPR")),
-          DataColumn(label: Text("FPR")),
+          DataColumn(label: Text('Threshold')),
+          DataColumn(label: Text('TPR')),
+          DataColumn(label: Text('FPR')),
         ],
         rows:
             rocPoints.map((point) {
-              final threshold = (point["threshold"] as num?)?.toDouble() ?? 0.0;
+              final threshold = (point['threshold'] as num?)?.toDouble() ?? 0.0;
+
               final tpr =
-                  ((point["TPR"] ?? point["tpr"]) as num?)?.toDouble() ?? 0.0;
+                  ((point['TPR'] ?? point['tpr']) as num?)?.toDouble() ?? 0.0;
+
               final fpr =
-                  ((point["FPR"] ?? point["fpr"]) as num?)?.toDouble() ?? 0.0;
+                  ((point['FPR'] ?? point['fpr']) as num?)?.toDouble() ?? 0.0;
 
               return DataRow(
                 cells: [
@@ -351,19 +369,20 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
               ElevatedButton.icon(
                 onPressed: _load,
                 icon: const Icon(Icons.refresh),
-                label: const Text("Refresh"),
+                label: const Text('Refresh'),
               ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: _trainMl,
-                icon: const Icon(Icons.model_training),
-                label: const Text("Train ML"),
-              ),
+              if (widget.currentUser.canRunExperiments) ...[
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _trainMl,
+                  icon: const Icon(Icons.model_training),
+                  label: const Text('Retrain ML'),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 12),
-
-          if (error != null)
+          if (error != null) ...[
+            const SizedBox(height: 12),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -374,47 +393,42 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
               ),
               child: Text(error!),
             ),
-
+          ],
           const SizedBox(height: 12),
-
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "ML vs Baseline Metrics",
+                    'ML vs Baseline Metrics',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   _buildMetricsSection(),
-
                   const SizedBox(height: 24),
-
                   const Text(
-                    "Confusion Matrix",
+                    'Confusion Matrix',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   _buildConfusionMatrix(),
-
                   const SizedBox(height: 24),
-
                   const Text(
-                    "ROC Curve",
+                    'ROC Curve',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    "This chart shows the trade-off between true positive rate and false positive rate across thresholds.",
+                    'This chart shows the trade-off between the true positive '
+                    'rate and false positive rate across different anomaly '
+                    'thresholds.',
                   ),
                   const SizedBox(height: 12),
                   _buildRocChart(),
-
                   const SizedBox(height: 24),
-
                   const Text(
-                    "ROC-Style Threshold Sweep Table",
+                    'ROC-Style Threshold Sweep Table',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -430,19 +444,20 @@ class _ExperimentResultsScreenState extends State<ExperimentResultsScreen> {
 }
 
 class RocChartPainter extends CustomPainter {
-  final List<dynamic> points;
-
   RocChartPainter(this.points);
+
+  final List<dynamic> points;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const double leftPad = 40;
-    const double bottomPad = 30;
-    const double topPad = 10;
-    const double rightPad = 10;
+    const double leftPadding = 40;
+    const double bottomPadding = 30;
+    const double topPadding = 10;
+    const double rightPadding = 10;
 
-    final chartWidth = size.width - leftPad - rightPad;
-    final chartHeight = size.height - topPad - bottomPad;
+    final chartWidth = size.width - leftPadding - rightPadding;
+
+    final chartHeight = size.height - topPadding - bottomPadding;
 
     final axisPaint =
         Paint()
@@ -455,7 +470,7 @@ class RocChartPainter extends CustomPainter {
           ..strokeWidth = 2.5
           ..style = PaintingStyle.stroke;
 
-    final diagPaint =
+    final diagonalPaint =
         Paint()
           ..color = Colors.grey
           ..strokeWidth = 1.5
@@ -467,63 +482,81 @@ class RocChartPainter extends CustomPainter {
           ..style = PaintingStyle.fill;
 
     canvas.drawLine(
-      Offset(leftPad, topPad),
-      Offset(leftPad, topPad + chartHeight),
-      axisPaint,
-    );
-    canvas.drawLine(
-      Offset(leftPad, topPad + chartHeight),
-      Offset(leftPad + chartWidth, topPad + chartHeight),
+      const Offset(leftPadding, topPadding),
+      Offset(leftPadding, topPadding + chartHeight),
       axisPaint,
     );
 
     canvas.drawLine(
-      Offset(leftPad, topPad + chartHeight),
-      Offset(leftPad + chartWidth, topPad),
-      diagPaint,
+      Offset(leftPadding, topPadding + chartHeight),
+      Offset(leftPadding + chartWidth, topPadding + chartHeight),
+      axisPaint,
     );
 
-    final parsed =
-        points.map((p) {
-          final fpr = ((p["FPR"] ?? p["fpr"]) as num?)?.toDouble() ?? 0.0;
-          final tpr = ((p["TPR"] ?? p["tpr"]) as num?)?.toDouble() ?? 0.0;
+    canvas.drawLine(
+      Offset(leftPadding, topPadding + chartHeight),
+      Offset(leftPadding + chartWidth, topPadding),
+      diagonalPaint,
+    );
+
+    final parsedPoints =
+        points.map((point) {
+          final fpr =
+              ((point['FPR'] ?? point['fpr']) as num?)?.toDouble() ?? 0.0;
+
+          final tpr =
+              ((point['TPR'] ?? point['tpr']) as num?)?.toDouble() ?? 0.0;
+
           return Offset(
-            leftPad + fpr * chartWidth,
-            topPad + chartHeight - (tpr * chartHeight),
+            leftPadding + fpr * chartWidth,
+            topPadding + chartHeight - (tpr * chartHeight),
           );
         }).toList();
 
-    if (parsed.length > 1) {
-      final path = Path()..moveTo(parsed.first.dx, parsed.first.dy);
-      for (final pt in parsed.skip(1)) {
-        path.lineTo(pt.dx, pt.dy);
+    if (parsedPoints.length > 1) {
+      final path = Path()..moveTo(parsedPoints.first.dx, parsedPoints.first.dy);
+
+      for (final point in parsedPoints.skip(1)) {
+        path.lineTo(point.dx, point.dy);
       }
+
       canvas.drawPath(path, linePaint);
     }
 
-    for (final pt in parsed) {
-      canvas.drawCircle(pt, 3.2, pointPaint);
+    for (final point in parsedPoints) {
+      canvas.drawCircle(point, 3.2, pointPaint);
     }
 
-    final textStyle = const TextStyle(fontSize: 11, color: Colors.black87);
-    final tp = TextPainter(textDirection: TextDirection.ltr);
+    const textStyle = TextStyle(fontSize: 11, color: Colors.black87);
+
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
     void drawText(String text, Offset offset) {
-      tp.text = TextSpan(text: text, style: textStyle);
-      tp.layout();
-      tp.paint(canvas, offset);
+      textPainter.text = TextSpan(text: text, style: textStyle);
+
+      textPainter.layout();
+      textPainter.paint(canvas, offset);
     }
 
-    drawText("TPR", const Offset(4, 4));
+    drawText('TPR', const Offset(4, 4));
+
     drawText(
-      "FPR",
-      Offset(leftPad + chartWidth - 20, topPad + chartHeight + 6),
+      'FPR',
+      Offset(leftPadding + chartWidth - 20, topPadding + chartHeight + 6),
     );
-    drawText("0.0", Offset(leftPad - 12, topPad + chartHeight + 4));
-    drawText("1.0", Offset(leftPad + chartWidth - 8, topPad + chartHeight + 4));
-    drawText("1.0", Offset(8, topPad - 2));
+
+    drawText('0.0', Offset(leftPadding - 12, topPadding + chartHeight + 4));
+
+    drawText(
+      '1.0',
+      Offset(leftPadding + chartWidth - 8, topPadding + chartHeight + 4),
+    );
+
+    drawText('1.0', Offset(8, topPadding - 2));
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant RocChartPainter oldDelegate) {
+    return oldDelegate.points != points;
+  }
 }

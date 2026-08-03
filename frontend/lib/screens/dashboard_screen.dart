@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import '../services/evaluation_api.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({required this.client, super.key});
+
+  final http.Client client;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final api = EvaluationApi();
+  late final EvaluationApi api;
+
   bool loading = true;
   String? error;
   Map<String, dynamic> summary = const {};
@@ -18,11 +23,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+
+    api = EvaluationApi(client: widget.client);
+
     _load();
   }
 
   Future<void> _load() async {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       loading = true;
       error = null;
@@ -30,26 +41,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final result = await api.getOverviewSummary();
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         summary = result;
         lastUpdated = DateTime.now();
         loading = false;
       });
-    } catch (e) {
-      if (!mounted) return;
+    } catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        error = e.toString();
+        error = exception.toString();
         loading = false;
       });
     }
   }
 
-  int _int(String key) => (summary[key] as num?)?.toInt() ?? 0;
+  int _int(String key) {
+    return (summary[key] as num?)?.toInt() ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -66,7 +88,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(width: 12),
               if (lastUpdated != null)
                 Text(
-                  'Updated ${TimeOfDay.fromDateTime(lastUpdated!).format(context)}',
+                  'Updated '
+                  '${TimeOfDay.fromDateTime(lastUpdated!).format(context)}',
                 ),
             ],
           ),
@@ -145,9 +168,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 24),
           _notice(
-            'Rule-based statuses represent explicit configured conditions. Machine-learning '
-            'anomalies represent statistical unusualness and should be investigated rather '
-            'than interpreted as legal or physical proof of danger.',
+            'Rule-based statuses represent explicit configured conditions. '
+            'Machine-learning anomalies represent statistical unusualness '
+            'and should be investigated rather than interpreted as legal or '
+            'physical proof of danger.',
             Colors.blue.shade50,
             Icons.info_outline,
           ),
