@@ -15,11 +15,9 @@ class AuthException implements Exception {
 }
 
 class AuthService {
-  AuthService({
-    http.Client? client,
-    FlutterSecureStorage? storage,
-  })  : _client = client ?? http.Client(),
-        _storage = storage ?? const FlutterSecureStorage();
+  AuthService({http.Client? client, FlutterSecureStorage? storage})
+    : _client = client ?? http.Client(),
+      _storage = storage ?? const FlutterSecureStorage();
 
   // Use 127.0.0.1 for Flutter Windows.
   // For an Android emulator, use http://10.0.2.2:8000.
@@ -36,13 +34,8 @@ class AuthService {
   }) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/auth/login'),
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: {
-        'username': username.trim(),
-        'password': password,
-      },
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {'username': username.trim(), 'password': password},
     );
 
     if (response.statusCode != 200) {
@@ -53,15 +46,10 @@ class AuthService {
     final token = body['access_token'] as String?;
 
     if (token == null || token.isEmpty) {
-      throw const AuthException(
-        'The server did not return an access token.',
-      );
+      throw const AuthException('The server did not return an access token.');
     }
 
-    await _storage.write(
-      key: _tokenKey,
-      value: token,
-    );
+    await _storage.write(key: _tokenKey, value: token);
 
     try {
       return await getCurrentUser();
@@ -80,10 +68,7 @@ class AuthService {
 
     final response = await _client.get(
       Uri.parse('$baseUrl/auth/me'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
     );
 
     if (response.statusCode == 401) {
