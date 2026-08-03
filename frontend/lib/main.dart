@@ -10,6 +10,8 @@ import 'screens/login_screen.dart';
 import 'screens/metrics_screen.dart';
 import 'screens/safety_rules_screen.dart';
 import 'services/auth_service.dart';
+import 'services/authenticated_client.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -24,6 +26,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final AuthService _authService;
+  late final AuthenticatedClient _apiClient;
 
   AuthUser? _currentUser;
   bool _isCheckingSession = true;
@@ -31,8 +34,25 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+
     _authService = AuthService();
+
+    _apiClient = AuthenticatedClient(
+      authService: _authService,
+      onUnauthorized: _handleUnauthorized,
+    );
+
     _restoreSession();
+  }
+
+  Future<void> _handleUnauthorized() async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _currentUser = null;
+    });
   }
 
   Future<void> _restoreSession() async {
@@ -91,6 +111,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    _apiClient.close();
     _authService.dispose();
     super.dispose();
   }
@@ -123,19 +144,25 @@ class _MyAppState extends State<MyApp> {
       );
     }
 
-    return HomeShell(currentUser: user, onLogout: _logout);
+    return HomeShell(
+      currentUser: user,
+      apiClient: _apiClient,
+      onLogout: _logout,
+    );
   }
 }
 
 class HomeShell extends StatefulWidget {
   const HomeShell({
     required this.currentUser,
+    required this.apiClient,
     required this.onLogout,
     super.key,
   });
 
   final AuthUser currentUser;
   final Future<void> Function() onLogout;
+  final http.Client apiClient;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
