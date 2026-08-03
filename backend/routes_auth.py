@@ -14,7 +14,6 @@ from auth import (
     hash_password,
     require_roles,
 )
-from database import get_db
 from models import User
 from schemas import UserCreate, UserRead, Token
 
